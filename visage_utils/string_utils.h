@@ -25,8 +25,19 @@
 #include <string>
 
 namespace visage {
+  /**
+   * @class String
+   * @brief A Unicode string class that internally uses UTF-32 for manipulation
+   *        and provides conversions to and from other encodings.
+   */
   class String {
   public:
+    /**
+     * @brief Converts a UTF-8 encoded string to a UTF-32 string.
+     * @tparam Utf32String The type of the output UTF-32 string (e.g., std::u32string, std::wstring on Linux/macOS).
+     * @param utf8_str The input UTF-8 string.
+     * @return The converted UTF-32 string.
+     */
     template<typename Utf32String>
     static Utf32String convertUtf8ToUtf32(const std::string& utf8_str) {
       Utf32String result;
@@ -68,7 +79,12 @@ namespace visage {
 
       return result;
     }
-
+    /**
+     * @brief Converts a UTF-32 encoded string to a UTF-8 string.
+     * @tparam Utf32String The type of the input UTF-32 string (e.g., std::u32string, std::wstring on Linux/macOS).
+     * @param utf32_str The input UTF-32 string.
+     * @return The converted UTF-8 string.
+     */
     template<typename Utf32String>
     static std::string convertUtf32ToUtf8(const Utf32String& utf32_str) {
       std::string result;
@@ -97,7 +113,12 @@ namespace visage {
       }
       return result;
     }
-
+    /**
+     * @brief Converts a UTF-32 encoded string to a UTF-16 string.
+     * @tparam T The type of the output UTF-16 string (e.g., std::u16string, std::wstring on Windows).
+     * @param utf32_str The input UTF-32 string.
+     * @return The converted UTF-16 string.
+     */
     template<typename T>
     static T convertUtf32ToUtf16(const std::u32string& utf32_str) {
       T result;
@@ -121,7 +142,12 @@ namespace visage {
       }
       return result;
     }
-
+    /**
+     * @brief Converts a UTF-16 encoded string to a UTF-32 string.
+     * @tparam T The type of the input UTF-16 string (e.g., std::u16string, std::wstring on Windows).
+     * @param utf16_str The input UTF-16 string.
+     * @return The converted UTF-32 string.
+     */
     template<typename T>
     static std::u32string convertUtf16ToUtf32(const T& utf16_str) {
       std::u32string result;
@@ -218,7 +244,11 @@ namespace visage {
     String(double value, int precision) : String(std::to_string(value)) {
       *this = withPrecision(precision);
     }
-
+    /**
+     * @brief Returns a new String with a specified number of decimal places.
+     * @param precision The number of decimal places.
+     * @return A new String object.
+     */
     String withPrecision(int precision) const {
       size_t pos = find('.');
 
@@ -246,9 +276,20 @@ namespace visage {
 
       return string_ + std::u32string(pos - string_.length(), '0');
     }
-
+    /**
+     * @brief Converts the String to a std::wstring.
+     * @return The wide string representation.
+     */
     std::wstring toWide() const { return convertToWide(string_); }
+    /**
+     * @brief Converts the String to a UTF-8 encoded std::string.
+     * @return The UTF-8 string representation.
+     */
     std::string toUtf8() const { return convertToUtf8(string_); }
+    /**
+     * @brief Gets the internal UTF-32 string.
+     * @return A const reference to the internal std::u32string.
+     */
     const std::u32string& toUtf32() const { return string_; }
 
     void removeTrailingZeros() {
@@ -267,7 +308,10 @@ namespace visage {
     String toUpper() const;
     String removeCharacters(const String& characters) const;
     String removeEmojiVariations() const;
-
+    /**
+     * @brief Converts the String to a float.
+     * @return The float value, or 0.0f on failure.
+     */
     float toFloat() const {
       try {
         return std::stof(toUtf8());
@@ -276,7 +320,10 @@ namespace visage {
         return 0.0f;
       }
     }
-
+    /**
+     * @brief Converts the String to an integer.
+     * @return The integer value, or 0 on failure.
+     */
     int toInt() const {
       try {
         return std::stoi(toUtf8());
@@ -398,7 +445,18 @@ namespace visage {
   inline std::ostream& operator<<(std::ostream& os, const String& string) {
     return os << string.toUtf8();
   }
-
+  /**
+   * @brief Encodes binary data into a Base64 string.
+   * @param data A pointer to the data to encode.
+   * @param size The size of the data in bytes.
+   * @return The Base64 encoded string.
+   */
   std::string encodeDataBase64(const unsigned char* data, size_t size);
+  /**
+   * @brief Decodes a Base64 string into binary data.
+   * @param string The Base64 string to decode.
+   * @param[out] size The size of the decoded data in bytes.
+   * @return A unique_ptr to a buffer containing the decoded data.
+   */
   std::unique_ptr<unsigned char[]> decodeBase64Data(const std::string& string, int& size);
 }

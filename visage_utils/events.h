@@ -29,7 +29,10 @@
 
 namespace visage {
   static constexpr int kUnprintableKeycodeMask = 1 << 30;
-
+  /**
+   * @enum MouseButton
+   * @brief Represents the buttons on a mouse.
+   */
   enum MouseButton {
     kMouseButtonNone = 0,
     kMouseButtonLeft = 1 << 0,
@@ -37,7 +40,10 @@ namespace visage {
     kMouseButtonRight = 1 << 2,
     kMouseButtonTouch = 1 << 3
   };
-
+  /**
+   * @enum MouseCursor
+   * @brief Represents the different types of mouse cursors.
+   */
   enum class MouseCursor {
     Invisible,
     Arrow,
@@ -53,7 +59,10 @@ namespace visage {
     BottomRightResize,
     MultiDirectionalResize,
   };
-
+  /**
+   * @enum Modifiers
+   * @brief Represents modifier keys that can be pressed with a mouse or keyboard event.
+   */
   enum Modifiers {
     kModifierNone = 0,
     kModifierShift = 1 << 0,
@@ -64,7 +73,10 @@ namespace visage {
     kModifierCmd = 1 << 4,
     kModifierMeta = 1 << 5,
   };
-
+  /**
+   * @enum HitTestResult
+   * @brief Represents the result of a hit test on a window frame.
+   */
   enum class HitTestResult {
     Client,
     TitleBar,
@@ -72,7 +84,10 @@ namespace visage {
     MinimizeButton,
     MaximizeButton,
   };
-
+  /**
+   * @enum KeyCode
+   * @brief Represents physical key codes on a keyboard.
+   */
   enum class KeyCode {
     Unknown = 0,
     A = 'a',
@@ -325,7 +340,15 @@ namespace visage {
   static constexpr bool isPrintableKeyCode(KeyCode key_code) {
     return key_code != KeyCode::Unknown && (static_cast<int>(key_code) & kUnprintableKeycodeMask) == 0;
   }
-
+  /**
+   * @class CallbackList
+   * @brief A container for a list of callbacks of the same type.
+   *
+   * This class allows for adding, removing, and invoking a collection of callbacks.
+   * When callbacks are invoked, the return value of the last callback in the list is returned.
+   *
+   * @tparam T The function signature of the callbacks (e.g., void(int)).
+   */
   template<typename T>
   class CallbackList {
   public:
@@ -346,14 +369,20 @@ namespace visage {
 
     CallbackList(const CallbackList& other) = default;
     CallbackList& operator=(const CallbackList& other) = default;
-
+    /**
+     * @brief Adds a callback to the list.
+     * @param callback The callback function to add.
+     */
     void add(std::function<T> callback) { callbacks_.push_back(std::move(callback)); }
 
     CallbackList& operator+=(std::function<T> callback) {
       add(callback);
       return *this;
     }
-
+    /**
+     * @brief Clears the list and sets a single callback.
+     * @param callback The callback function to set.
+     */
     void set(std::function<T> callback) {
       callbacks_.clear();
       callbacks_.push_back(std::move(callback));
@@ -363,7 +392,10 @@ namespace visage {
       set(callback);
       return *this;
     }
-
+    /**
+     * @brief Removes a callback from the list.
+     * @param callback The callback function to remove.
+     */
     void remove(const std::function<T>& callback) {
       auto compare = [&](const std::function<T>& other) {
         return other.target_type() == callback.target_type();
@@ -377,15 +409,24 @@ namespace visage {
       remove(callback);
       return *this;
     }
-
+    /**
+     * @brief Resets the list to its original state (containing only the callback it was constructed with, if any).
+     */
     void reset() {
       callbacks_.clear();
       if (original_)
         callbacks_.push_back(*original_);
     }
-
+    /**
+     * @brief Removes all callbacks from the list.
+     */
     void clear() { callbacks_.clear(); }
-
+    /**
+     * @brief Invokes all callbacks in the list.
+     * @tparam Args The types of the arguments to pass to the callbacks.
+     * @param args The arguments to pass to the callbacks.
+     * @return The return value of the last callback in the list.
+     */
     template<typename... Args>
     auto callback(Args&&... args) const {
       if (callbacks_.empty())

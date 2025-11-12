@@ -31,16 +31,25 @@
 #include <thread>
 
 namespace visage {
+  /**
+   * @class Thread
+   * @brief A simple wrapper around std::thread with support for naming and stopping.
+   */
   class Thread {
   public:
     static inline std::thread::id main_thread_id_;
     static inline bool main_thread_set_ = false;
-
+    /**
+     * @brief Sets the current thread as the main thread.
+     */
     static void setAsMainThread() {
       main_thread_set_ = true;
       main_thread_id_ = std::this_thread::get_id();
     }
-
+    /**
+     * @brief Checks if the current thread is the main thread.
+     * @return True if the current thread is the main thread, false otherwise.
+     */
     static bool isMainThread() {
       return !main_thread_set_ || main_thread_id_ == std::this_thread::get_id();
     }
@@ -52,12 +61,17 @@ namespace visage {
       VISAGE_ASSERT(!running());
       stop();
     }
-
+    /**
+     * @brief The main function to be executed by the thread.
+     *        This can be overridden by a subclass, or a task can be set with setThreadTask().
+     */
     virtual void run() {
       if (task_)
         task_();
     }
-
+    /**
+     * @brief Starts the thread execution.
+     */
     void start() {
       VISAGE_ASSERT(!running());
 #if VISAGE_EMSCRIPTEN
@@ -71,7 +85,9 @@ namespace visage {
       completed_ = false;
       thread_ = std::make_unique<std::thread>(&Thread::startRun, this);
     }
-
+    /**
+     * @brief Signals the thread to stop and waits for it to join.
+     */
     void stop() {
       should_run_ = false;
       if (thread_) {
@@ -80,13 +96,30 @@ namespace visage {
         thread_.reset();
       }
     }
-
+    /**
+     * @brief Puts the current thread to sleep for a specified duration.
+     * @param ms The sleep duration in milliseconds.
+     */
     static void sleep(int ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
+    /**
+     * @brief Puts the current thread to sleep for a specified duration.
+     * @param us The sleep duration in microseconds.
+     */
     static void sleepUs(int us) { std::this_thread::sleep_for(std::chrono::microseconds(us)); }
+    /**
+     * @brief Yields the execution of the current thread.
+     */
     static void yield() { std::this_thread::yield(); }
-
+    /**
+     * @brief Sets a task to be executed by the thread's run() method.
+     * @param task The function to execute.
+     */
     void setThreadTask(std::function<void()> task) { task_ = std::move(task); }
-
+    /**
+     * @brief Waits for the thread to complete its execution.
+     * @param ms_timeout The maximum time to wait in milliseconds.
+     * @return True if the thread completed within the timeout, false otherwise.
+     */
     bool waitForEnd(int ms_timeout) {
       long long ms_start = time::milliseconds();
       while (!completed()) {
