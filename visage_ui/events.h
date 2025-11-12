@@ -30,19 +30,42 @@
 
 namespace visage {
   class Frame;
-
+  /**
+   * @class EventTimer
+   * @brief A timer for triggering events at regular intervals.
+   */
   class EventTimer {
   public:
     EventTimer() = default;
     virtual ~EventTimer();
-
+    /**
+     * @brief Returns the callback list for the timer event.
+     * @return A reference to the on_timer_callback_ callback list.
+     */
     auto& onTimerCallback() { return on_timer_callback_; }
-
+    /**
+     * @brief Starts the timer.
+     * @param ms The timer interval in milliseconds.
+     */
     void startTimer(int ms);
+    /**
+     * @brief Stops the timer.
+     */
     void stopTimer();
+    /**
+     * @brief Checks if the timer should be triggered.
+     * @param current_time The current time.
+     * @return True if the timer should be triggered, false otherwise.
+     */
     bool checkTimer(long long current_time);
+    /**
+     * @brief The callback function that is called when the timer is triggered.
+     */
     virtual void timerCallback() { }
-
+    /**
+     * @brief Checks if the timer is running.
+     * @return True if the timer is running, false otherwise.
+     */
     bool isRunning() const {
       VISAGE_ASSERT(ms_ >= -1);
       return ms_ > 0;
@@ -55,7 +78,10 @@ namespace visage {
     int ms_ = 0;
     long long last_run_time_ = 0;
   };
-
+  /**
+   * @class EventManager
+   * @brief A singleton for managing event timers and callbacks.
+   */
   class EventManager {
   public:
     static EventManager& instance() {
@@ -65,10 +91,24 @@ namespace visage {
 
     EventManager(const EventManager&) = delete;
     EventManager& operator=(const EventManager&) = delete;
-
+    /**
+     * @brief Adds a timer to the event manager.
+     * @param timer The timer to add.
+     */
     void addTimer(EventTimer* timer);
+    /**
+     * @brief Removes a timer from the event manager.
+     * @param timer The timer to remove.
+     */
     void removeTimer(const EventTimer* timer);
+    /**
+     * @brief Adds a callback to be executed on the event thread.
+     * @param callback The callback to add.
+     */
     void addCallback(std::function<void()> callback);
+    /**
+     * @brief Checks all event timers and triggers them if necessary.
+     */
     void checkEventTimers();
 
   private:
@@ -82,7 +122,10 @@ namespace visage {
   static void runOnEventThread(std::function<void()> function) {
     EventManager::instance().addCallback(std::move(function));
   }
-
+  /**
+   * @struct MouseEvent
+   * @brief Represents a mouse event.
+   */
   struct MouseEvent {
     Point relativePosition() const { return relative_position; }
     Point windowPosition() const { return window_position; }
@@ -109,9 +152,16 @@ namespace visage {
     bool isLeftButton() const { return button_id == kMouseButtonLeft; }
     bool isMiddleButton() const { return button_id == kMouseButtonMiddle; }
     bool isRightButton() const { return button_id == kMouseButtonRight; }
-
+    /**
+     * @brief Creates a new MouseEvent relative to a different frame.
+     * @param new_frame The frame to make the event relative to.
+     * @return The new MouseEvent.
+     */
     MouseEvent relativeTo(const Frame* new_frame) const;
-
+    /**
+     * @brief Checks if the event should trigger a popup menu.
+     * @return True if a popup should be triggered, false otherwise.
+     */
     bool shouldTriggerPopup() const {
       return isRightButton() || (isLeftButton() && isMacCtrlDown());
     }
@@ -133,7 +183,10 @@ namespace visage {
     bool wheel_momentum = false;
     int repeat_click_count = 0;
   };
-
+  /**
+   * @class KeyEvent
+   * @brief Represents a keyboard event.
+   */
   class KeyEvent {
   public:
     KeyEvent(KeyCode key, int mods, bool is_down, bool repeat = false) :
@@ -151,25 +204,37 @@ namespace visage {
     int modifierMask() const { return modifiers; }
     bool isMainModifier() const { return isRegCtrlDown() || isCmdDown(); }
     bool isRepeat() const { return is_repeat; }
-
+    /**
+     * @brief Creates a new KeyEvent with the main modifier (Ctrl or Cmd) pressed.
+     * @return The new KeyEvent.
+     */
     KeyEvent withMainModifier() const {
       KeyEvent copy = *this;
       copy.modifiers = modifiers | kModifierRegCtrl;
       return copy;
     }
-
+    /**
+     * @brief Creates a new KeyEvent with the meta modifier pressed.
+     * @return The new KeyEvent.
+     */
     KeyEvent withMeta() const {
       KeyEvent copy = *this;
       copy.modifiers = modifiers | kModifierMeta;
       return copy;
     }
-
+    /**
+     * @brief Creates a new KeyEvent with the shift modifier pressed.
+     * @return The new KeyEvent.
+     */
     KeyEvent withShift() const {
       KeyEvent copy = *this;
       copy.modifiers = modifiers | kModifierShift;
       return copy;
     }
-
+    /**
+     * @brief Creates a new KeyEvent with the alt modifier pressed.
+     * @return The new KeyEvent.
+     */
     KeyEvent withAlt() const {
       KeyEvent copy = *this;
       copy.modifiers = modifiers | kModifierAlt;

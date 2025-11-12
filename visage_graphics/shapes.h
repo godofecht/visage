@@ -43,14 +43,20 @@ namespace visage {
   class Shader;
 
   static constexpr float kFullThickness = FLT_MAX;
-
+  /**
+   * @enum Direction
+   * @brief Specifies a direction.
+   */
   enum class Direction {
     Left,
     Up,
     Right,
     Down,
   };
-
+  /**
+   * @struct ClampBounds
+   * @brief Represents the clamping bounds for drawing.
+   */
   struct ClampBounds {
     float left = 1.0f;
     float top = 1.0f;
@@ -70,7 +76,10 @@ namespace visage {
                std::max(new_top, std::min(bottom, y + height)) };
     }
   };
-
+  /**
+   * @struct DrawBatch
+   * @brief Represents a batch of shapes to be drawn.
+   */
   template<typename T>
   struct DrawBatch {
     DrawBatch(const std::vector<T>* shapes, std::vector<IBounds>* invalid_rects, int x, int y) :
@@ -84,7 +93,10 @@ namespace visage {
 
   template<typename T>
   using BatchVector = std::vector<DrawBatch<T>>;
-
+  /**
+   * @struct BaseShape
+   * @brief A base struct for all drawable shapes.
+   */
   struct BaseShape {
     BaseShape(const void* batch_id, const ClampBounds& clamp, const PackedBrush* brush, float x,
               float y, float width, float height) :
@@ -153,7 +165,10 @@ namespace visage {
     vertices[3].x = right;
     vertices[3].y = bottom;
   }
-
+  /**
+   * @struct Shape
+   * @brief A template struct for a drawable shape.
+   */
   template<typename VertexType = ShapeVertex>
   struct Shape : BaseShape {
     typedef VertexType Vertex;
@@ -161,7 +176,10 @@ namespace visage {
     Shape(const void* batch_id, const ClampBounds& clamp, const PackedBrush* brush, float x, float y,
           float width, float height) : BaseShape(batch_id, clamp, brush, x, y, width, height) { }
   };
-
+  /**
+   * @struct Primitive
+   * @brief A template struct for a drawable primitive shape.
+   */
   template<typename VertexType = ShapeVertex>
   struct Primitive : Shape<VertexType> {
     Primitive(const void* batch_id, const ClampBounds& clamp, const PackedBrush* brush, float x,
@@ -181,7 +199,10 @@ namespace visage {
     float thickness = kFullThickness;
     float pixel_width = 1.0f;
   };
-
+  /**
+   * @struct Fill
+   * @brief Represents a solid fill shape.
+   */
   struct Fill : Primitive<> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -192,7 +213,10 @@ namespace visage {
 
     void setVertexData(Vertex* vertices) const { setPrimitiveData(vertices); }
   };
-
+  /**
+   * @struct Rectangle
+   * @brief Represents a rectangle shape.
+   */
   struct Rectangle : Primitive<> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -203,7 +227,10 @@ namespace visage {
 
     void setVertexData(Vertex* vertices) const { setPrimitiveData(vertices); }
   };
-
+  /**
+   * @struct RoundedRectangle
+   * @brief Represents a rounded rectangle shape.
+   */
   struct RoundedRectangle : Primitive<> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -223,7 +250,10 @@ namespace visage {
 
     float rounding = 0.0f;
   };
-
+  /**
+   * @struct Circle
+   * @brief Represents a circle shape.
+   */
   struct Circle : Primitive<> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -234,7 +264,10 @@ namespace visage {
 
     void setVertexData(Vertex* vertices) const { setPrimitiveData(vertices); }
   };
-
+  /**
+   * @struct Squircle
+   * @brief Represents a squircle shape.
+   */
   struct Squircle : Primitive<> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -252,7 +285,10 @@ namespace visage {
 
     float power = 1.0f;
   };
-
+  /**
+   * @struct FlatArc
+   * @brief Represents an arc with flat ends.
+   */
   struct FlatArc : Primitive<> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -276,7 +312,10 @@ namespace visage {
     float center_radians = 0.0f;
     float radians = 0.0f;
   };
-
+  /**
+   * @struct RoundedArc
+   * @brief Represents an arc with rounded ends.
+   */
   struct RoundedArc : Primitive<> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -300,7 +339,10 @@ namespace visage {
     float center_radians = 0.0f;
     float radians = 0.0f;
   };
-
+  /**
+   * @struct FlatSegment
+   * @brief Represents a line segment with flat ends.
+   */
   struct FlatSegment : Primitive<ComplexShapeVertex> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -329,7 +371,10 @@ namespace visage {
     float b_x = 0.0f;
     float b_y = 0.0f;
   };
-
+  /**
+   * @struct RoundedSegment
+   * @brief Represents a line segment with rounded ends.
+   */
   struct RoundedSegment : Primitive<ComplexShapeVertex> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -358,7 +403,10 @@ namespace visage {
     float b_x = 0.0f;
     float b_y = 0.0f;
   };
-
+  /**
+   * @struct Triangle
+   * @brief Represents a triangle shape.
+   */
   struct Triangle : Primitive<ComplexShapeVertex> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -392,7 +440,10 @@ namespace visage {
     float c_x = 0.0f;
     float c_y = 0.0f;
   };
-
+  /**
+   * @struct QuadraticBezier
+   * @brief Represents a quadratic Bezier curve shape.
+   */
   struct QuadraticBezier : Primitive<ComplexShapeVertex> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -426,7 +477,10 @@ namespace visage {
     float c_x = 0.0f;
     float c_y = 0.0f;
   };
-
+  /**
+   * @struct Diamond
+   * @brief Represents a diamond shape.
+   */
   struct Diamond : Primitive<> {
     VISAGE_CREATE_BATCH_ID
     static const EmbeddedFile& vertexShader();
@@ -444,7 +498,10 @@ namespace visage {
 
     float rounding = 0.0f;
   };
-
+  /**
+   * @struct ImageWrapper
+   * @brief A shape for drawing an image.
+   */
   struct ImageWrapper : Shape<TextureVertex> {
     static const EmbeddedFile& vertexShader();
     static const EmbeddedFile& fragmentShader();
@@ -466,7 +523,10 @@ namespace visage {
     ImageAtlas::PackedImage packed_image;
     ImageAtlas* image_atlas = nullptr;
   };
-
+  /**
+   * @struct GraphLineWrapper
+   * @brief A shape for drawing a line graph.
+   */
   struct GraphLineWrapper : Primitive<> {
     static const EmbeddedFile& vertexShader();
     static const EmbeddedFile& fragmentShader();
@@ -491,7 +551,10 @@ namespace visage {
     GraphData data;
     ImageAtlas::PackedImage packed_data;
   };
-
+  /**
+   * @struct GraphFillWrapper
+   * @brief A shape for drawing a filled graph.
+   */
   struct GraphFillWrapper : Primitive<> {
     static const EmbeddedFile& vertexShader();
     static const EmbeddedFile& fragmentShader();
@@ -522,7 +585,10 @@ namespace visage {
     GraphData data;
     ImageAtlas::PackedImage packed_data;
   };
-
+  /**
+   * @struct PathFillWrapper
+   * @brief A shape for drawing a filled path.
+   */
   struct PathFillWrapper : Shape<> {
     VISAGE_CREATE_BATCH_ID
     static constexpr int kLineVerticesPerPoint = 6;
@@ -545,7 +611,10 @@ namespace visage {
 
     int numVertices() const { return triangulation.points.size(); }
   };
-
+  /**
+   * @class VectorPool
+   * @brief A pool for reusing std::vector instances to reduce allocations.
+   */
   template<typename T>
   class VectorPool {
   public:
@@ -595,7 +664,10 @@ namespace visage {
 
     std::vector<std::vector<T>> pool_;
   };
-
+  /**
+   * @struct TextBlock
+   * @brief A shape for drawing a block of text.
+   */
   struct TextBlock : Shape<TextureVertex> {
     TextBlock(const ClampBounds& clamp, const PackedBrush* brush, float x, float y, float width,
               float height, Text* text, const Font& font, Direction direction) :
@@ -666,7 +738,10 @@ namespace visage {
     Font font;
     Direction direction = Direction::Up;
   };
-
+  /**
+   * @struct ShaderWrapper
+   * @brief A shape for drawing a custom shader.
+   */
   struct ShaderWrapper : Shape<> {
     ShaderWrapper(const ClampBounds& clamp, const PackedBrush* brush, float x, float y, float width,
                   float height, Shader* shader) :
@@ -676,7 +751,10 @@ namespace visage {
 
     Shader* shader = nullptr;
   };
-
+  /**
+   * @struct SampleRegion
+   * @brief A shape for sampling a region, optionally with a post-processing effect.
+   */
   struct SampleRegion : Shape<PostEffectVertex> {
     static const EmbeddedFile& vertexShader();
     static const EmbeddedFile& fragmentShader();

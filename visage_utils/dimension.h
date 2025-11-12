@@ -25,17 +25,35 @@
 #include <functional>
 
 namespace visage {
-
+  /**
+   * @struct Dimension
+   * @brief Represents a flexible dimension that can be defined in various units
+   *        (e.g., pixels, percentages) and calculated based on context.
+   */
   struct Dimension {
     float amount = 0.0f;
     std::function<float(float, float, float, float)> compute_function = nullptr;
-
+    /**
+     * @brief Computes the final value of the dimension.
+     * @param dpi_scale The current DPI scale of the display.
+     * @param parent_width The width of the parent container.
+     * @param parent_height The height of the parent container.
+     * @param default_value The value to return if no computation function is set.
+     * @return The computed value as a float.
+     */
     float compute(float dpi_scale, float parent_width, float parent_height, float default_value = 0.0f) const {
       if (compute_function)
         return compute_function(amount, dpi_scale, parent_width, parent_height);
       return default_value;
     }
-
+    /**
+     * @brief Computes the final value of the dimension and rounds it to the nearest integer.
+     * @param dpi_scale The current DPI scale of the display.
+     * @param parent_width The width of the parent container.
+     * @param parent_height The height of the parent container.
+     * @param default_value The value to return if no computation function is set.
+     * @return The computed value as an integer.
+     */
     int computeInt(float dpi_scale, float parent_width, float parent_height, int default_value = 0) const {
       if (compute_function)
         return std::round(compute_function(amount, dpi_scale, parent_width, parent_height));
@@ -46,36 +64,60 @@ namespace visage {
     Dimension(float amount) { *this = logicalPixels(amount); }
     Dimension(float amount, std::function<float(float, float, float, float)> compute) :
         amount(amount), compute_function(std::move(compute)) { }
-
+    /**
+     * @brief Creates a Dimension in native pixels (ignoring DPI scale).
+     * @param pixels The number of native pixels.
+     * @return A new Dimension object.
+     */
     static Dimension nativePixels(float pixels) {
       return Dimension(pixels, [](float amount, float, float, float) { return amount; });
     }
-
+    /**
+     * @brief Creates a Dimension in logical pixels (scaled by DPI).
+     * @param pixels The number of logical pixels.
+     * @return A new Dimension object.
+     */
     static Dimension logicalPixels(float pixels) {
       return Dimension(pixels, [](float amount, float scale, float, float) { return scale * amount; });
     }
-
+    /**
+     * @brief Creates a Dimension as a percentage of the parent's width.
+     * @param percent The percentage (0-100).
+     * @return A new Dimension object.
+     */
     static Dimension widthPercent(float percent) {
       float ratio = percent * 0.01f;
       return Dimension(ratio, [](float amount, float, float parent_width, float) {
         return amount * parent_width;
       });
     }
-
+    /**
+     * @brief Creates a Dimension as a percentage of the parent's height.
+     * @param percent The percentage (0-100).
+     * @return A new Dimension object.
+     */
     static Dimension heightPercent(float percent) {
       float ratio = percent * 0.01f;
       return Dimension(ratio, [](float amount, float, float, float parent_height) {
         return amount * parent_height;
       });
     }
-
+    /**
+     * @brief Creates a Dimension as a percentage of the smaller of the parent's width and height.
+     * @param percent The percentage (0-100).
+     * @return A new Dimension object.
+     */
     static Dimension viewMinPercent(float percent) {
       float ratio = percent * 0.01f;
       return Dimension(ratio, [](float amount, float, float parent_width, float parent_height) {
         return amount * std::min(parent_width, parent_height);
       });
     }
-
+    /**
+     * @brief Creates a Dimension as a percentage of the larger of the parent's width and height.
+     * @param percent The percentage (0-100).
+     * @return A new Dimension object.
+     */
     static Dimension viewMaxPercent(float percent) {
       float ratio = percent * 0.01f;
       return Dimension(ratio, [](float amount, float, float parent_width, float parent_height) {

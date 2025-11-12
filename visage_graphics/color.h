@@ -30,8 +30,19 @@
 #include <string>
 
 namespace visage {
+  /**
+   * @class Color
+   * @brief Represents a color with red, green, blue, and alpha channels.
+   *
+   * This class provides methods for creating, manipulating, and converting colors.
+   * It supports both 8-bit and 16-bit per channel color depths, as well as HDR values.
+   */
   class Color {
   public:
+    /**
+     * @enum Channel
+     * @brief The indices of the color channels.
+     */
     enum {
       kBlue,
       kGreen,
@@ -39,12 +50,32 @@ namespace visage {
       kAlpha,
       kNumChannels
     };
+    /**
+     * @brief The number of bits per color channel.
+     */
     static constexpr int kBitsPerColor = 8;
+    /**
+     * @brief The scale factor for converting an 8-bit color value to a float.
+     */
     static constexpr float kFloatScale = 1.0f / 0xff;
+    /**
+     * @brief The scale factor for converting a 16-bit color value to a float.
+     */
     static constexpr float kFloatScale16 = 1.0f / 0xffff;
+    /**
+     * @brief The range of the hue component.
+     */
     static constexpr float kHueRange = 360.0f;
+    /**
+     * @brief The normalization factor for gradients.
+     */
     static constexpr float kGradientNormalization = 64.0f;
-
+    /**
+     * @brief Compares two colors.
+     * @param a The first color.
+     * @param b The second color.
+     * @return -1 if a < b, 0 if a == b, 1 if a > b.
+     */
     static int compare(const Color& a, const Color& b) {
       for (int i = 0; i < kNumChannels; ++i) {
         if (a.values_[i] < b.values_[i])
@@ -58,7 +89,14 @@ namespace visage {
         return 1;
       return 0;
     }
-
+    /**
+     * @brief Creates a color from alpha, hue, saturation, and value components.
+     * @param alpha The alpha component (0.0 to 1.0).
+     * @param hue The hue component (0.0 to 360.0).
+     * @param saturation The saturation component (0.0 to 1.0).
+     * @param value The value component (0.0 to 1.0).
+     * @return The created color.
+     */
     static Color fromAHSV(float alpha, float hue, float saturation, float value) {
       static constexpr float kHueCutoff = kHueRange / 6.0f;
       Color result;
@@ -101,31 +139,51 @@ namespace visage {
       result.values_[middle_index] += conversion;
       return result;
     }
-
+    /**
+     * @brief Creates a color from a 16-bit ABGR value.
+     * @param abgr The 16-bit ABGR value.
+     * @return The created color.
+     */
     static Color fromABGR16(uint64_t abgr) {
       Color result;
       result.loadABGR16(abgr);
       return result;
     }
-
+    /**
+     * @brief Creates a color from a 16-bit ARGB value.
+     * @param argb The 16-bit ARGB value.
+     * @return The created color.
+     */
     static Color fromARGB16(uint64_t argb) {
       Color result;
       result.loadARGB16(argb);
       return result;
     }
-
+    /**
+     * @brief Creates a color from an 8-bit ABGR value.
+     * @param abgr The 8-bit ABGR value.
+     * @return The created color.
+     */
     static Color fromABGR(unsigned int abgr) {
       Color result;
       result.loadABGR(abgr);
       return result;
     }
-
+    /**
+     * @brief Creates a color from an 8-bit ARGB value.
+     * @param argb The 8-bit ARGB value.
+     * @return The created color.
+     */
     static Color fromARGB(unsigned int argb) {
       Color result;
       result.loadARGB(argb);
       return result;
     }
-
+    /**
+     * @brief Creates a color from a hex string.
+     * @param color_string The hex string (e.g., "#RRGGBB", "#AARRGGBB").
+     * @return The created color.
+     */
     static Color fromHexString(const std::string& color_string) {
       if (color_string.empty())
         return 0;
@@ -146,8 +204,18 @@ namespace visage {
         return {};
       }
     }
-
+    /**
+     * @brief Default constructor.
+     */
     Color() = default;
+    /**
+     * @brief Constructs a color from float components.
+     * @param alpha The alpha component (0.0 to 1.0).
+     * @param red The red component (0.0 to 1.0).
+     * @param green The green component (0.0 to 1.0).
+     * @param blue The blue component (0.0 to 1.0).
+     * @param hdr The HDR value.
+     */
     Color(float alpha, float red, float green, float blue, float hdr = 1.0f) {
       values_[kAlpha] = alpha;
       values_[kRed] = red;
@@ -156,59 +224,93 @@ namespace visage {
       hdr_ = hdr;
     }
     Color(const Color&) = default;
-
+    /**
+     * @brief Constructs a color from an 8-bit ARGB value.
+     * @param argb The 8-bit ARGB value.
+     * @param hdr The HDR value.
+     */
     Color(unsigned int argb, float hdr = 1.0f) noexcept {
       loadARGB(argb);
       hdr_ = hdr;
     }
-
+    /**
+     * @brief Loads a color from a 16-bit ARGB value.
+     * @param argb The 16-bit ARGB value.
+     */
     void loadARGB16(uint64_t argb) {
       for (int i = 0; i < kNumChannels; ++i) {
         int shift = kBitsPerColor * i * 2;
         values_[i] = ((argb >> shift) & 0xffff) * kFloatScale16;
       }
     }
-
+    /**
+     * @brief Loads a color from a 16-bit ABGR value.
+     * @param abgr The 16-bit ABGR value.
+     */
     void loadABGR16(uint64_t abgr) {
       loadARGB16(abgr);
       std::swap(values_[kBlue], values_[kRed]);
     }
-
+    /**
+     * @brief Loads a color from an 8-bit ARGB value.
+     * @param argb The 8-bit ARGB value.
+     */
     void loadARGB(unsigned int argb) {
       for (int i = 0; i < kNumChannels; ++i) {
         int shift = kBitsPerColor * i;
         values_[i] = ((argb >> shift) & 0xff) * kFloatScale;
       }
     }
-
+    /**
+     * @brief Loads a color from an 8-bit ABGR value.
+     * @param abgr The 8-bit ABGR value.
+     */
     void loadABGR(unsigned int abgr) {
       loadARGB(abgr);
       std::swap(values_[kBlue], values_[kRed]);
     }
-
+    /**
+     * @brief Sets the alpha component of the color.
+     * @param alpha The new alpha value (0.0 to 1.0).
+     */
     void setAlpha(float alpha) { values_[kAlpha] = std::max(0.0f, std::min(1.0f, alpha)); }
-
+    /**
+     * @brief Sets the HDR value of the color.
+     * @param hdr The new HDR value.
+     */
     void setHdr(float hdr) { hdr_ = std::max(0.0f, hdr); }
-
+    /**
+     * @brief Multiplies the RGB components of the color by a given amount.
+     * @param amount The amount to multiply by.
+     */
     void multRgb(float amount) {
       for (int i = 0; i < kAlpha; ++i)
         values_[i] *= amount;
     }
-
+    /**
+     * @brief Converts the color to a 16-bit ABGR value.
+     * @return The 16-bit ABGR value.
+     */
     uint64_t toABGR16() const {
       uint64_t value = floatToHex16(values_[kAlpha]) << (6 * kBitsPerColor);
       value += floatToHex16(values_[kBlue]) << (4 * kBitsPerColor);
       value += floatToHex16(values_[kGreen]) << (2 * kBitsPerColor);
       return value + floatToHex16(values_[kRed]);
     }
-
+    /**
+     * @brief Converts the color to a 16-bit ARGB value.
+     * @return The 16-bit ARGB value.
+     */
     uint64_t toARGB16() const {
       uint64_t value = floatToHex16(values_[kAlpha]) << (6 * kBitsPerColor);
       value += floatToHex16(values_[kRed]) << (4 * kBitsPerColor);
       value += floatToHex16(values_[kGreen]) << (2 * kBitsPerColor);
       return value + floatToHex16(values_[kBlue]);
     }
-
+    /**
+     * @brief Converts the color to a 16-bit floating point ABGR value.
+     * @return The 16-bit floating point ABGR value.
+     */
     uint64_t toABGR16F() const {
       float mult = hdr_ / kGradientNormalization;
       uint64_t value = floatToHalf(values_[kAlpha]) << (6 * kBitsPerColor);
@@ -216,7 +318,10 @@ namespace visage {
       value += floatToHalf(values_[kGreen] * mult) << (2 * kBitsPerColor);
       return value + floatToHalf(values_[kRed] * mult);
     }
-
+    /**
+     * @brief Converts the color to a 16-bit floating point ARGB value.
+     * @return The 16-bit floating point ARGB value.
+     */
     uint64_t toARGB16F() const {
       float mult = hdr_ / kGradientNormalization;
       uint64_t value = floatToHalf(values_[kAlpha]) << (6 * kBitsPerColor);
@@ -224,37 +329,71 @@ namespace visage {
       value += floatToHalf(values_[kGreen] * mult) << (2 * kBitsPerColor);
       return value + floatToHalf(values_[kBlue] * mult);
     }
-
+    /**
+     * @brief Converts the color to an 8-bit ABGR value.
+     * @return The 8-bit ABGR value.
+     */
     unsigned int toABGR() const {
       unsigned int value = floatToHex(values_[kAlpha]) << (3 * kBitsPerColor);
       value += floatToHex(values_[kBlue]) << (2 * kBitsPerColor);
       value += floatToHex(values_[kGreen]) << kBitsPerColor;
       return value + floatToHex(values_[kRed]);
     }
-
+    /**
+     * @brief Converts the color to an 8-bit ARGB value.
+     * @return The 8-bit ARGB value.
+     */
     unsigned int toARGB() const {
       unsigned int value = floatToHex(values_[kAlpha]) << (3 * kBitsPerColor);
       value += floatToHex(values_[kRed]) << (2 * kBitsPerColor);
       value += floatToHex(values_[kGreen]) << kBitsPerColor;
       return value + floatToHex(values_[kBlue]);
     }
-
+    /**
+     * @brief Converts the color to an 8-bit RGB value.
+     * @return The 8-bit RGB value.
+     */
     unsigned int toRGB() const {
       unsigned int value = floatToHex(values_[kRed]) << (2 * kBitsPerColor);
       value += floatToHex(values_[kGreen]) << kBitsPerColor;
       return value + floatToHex(values_[kBlue]);
     }
-
+    /**
+     * @brief Gets the alpha component.
+     * @return The alpha component.
+     */
     float alpha() const { return values_[kAlpha]; }
+    /**
+     * @brief Gets the red component.
+     * @return The red component.
+     */
     float red() const { return values_[kRed]; }
+    /**
+     * @brief Gets the green component.
+     * @return The green component.
+     */
     float green() const { return values_[kGreen]; }
+    /**
+     * @brief Gets the blue component.
+     * @return The blue component.
+     */
     float blue() const { return values_[kBlue]; }
+    /**
+     * @brief Gets the HDR value.
+     * @return The HDR value.
+     */
     float hdr() const { return hdr_; }
-
+    /**
+     * @brief Gets the value (brightness) component.
+     * @return The value component.
+     */
     float value() const {
       return std::max(values_[kRed], std::max(values_[kGreen], values_[kBlue]));
     }
-
+    /**
+     * @brief Gets the saturation component.
+     * @return The saturation component.
+     */
     float saturation() const {
       float val = value();
       if (val <= 0.0f)
@@ -262,7 +401,10 @@ namespace visage {
       float range = val - minColor();
       return range / val;
     }
-
+    /**
+     * @brief Gets the hue component.
+     * @return The hue component.
+     */
     float hue() const {
       float min = minColor();
       float max = value();
@@ -290,10 +432,25 @@ namespace visage {
         return 4.0f * color_range - color_range * (values_[kGreen] - min) / range;
       return 4.0f * color_range + color_range * (values_[kRed] - min) / range;
     }
-
+    /**
+     * @brief Gets the alpha component as an 8-bit hex value.
+     * @return The 8-bit hex alpha value.
+     */
     unsigned int hexAlpha() const { return floatToHex(values_[kAlpha]); }
+    /**
+     * @brief Gets the red component as an 8-bit hex value.
+     * @return The 8-bit hex red value.
+     */
     unsigned int hexRed() const { return floatToHex(values_[kRed]); }
+    /**
+     * @brief Gets the green component as an 8-bit hex value.
+     * @return The 8-bit hex green value.
+     */
     unsigned int hexGreen() const { return floatToHex(values_[kGreen]); }
+    /**
+     * @brief Gets the blue component as an 8-bit hex value.
+     * @return The 8-bit hex blue value.
+     */
     unsigned int hexBlue() const { return floatToHex(values_[kBlue]); }
 
     Color& operator=(const Color&) = default;
@@ -326,12 +483,32 @@ namespace visage {
 
     bool operator<(const Color& other) const { return compare(*this, other) < 0; }
     bool operator>(const Color& other) const { return compare(*this, other) > 0; }
-
+    /**
+     * @brief Encodes the color to a string.
+     * @return The encoded string.
+     */
     std::string encode() const;
+    /**
+     * @brief Encodes the color to an output string stream.
+     * @param stream The output string stream.
+     */
     void encode(std::ostringstream& stream) const;
+    /**
+     * @brief Decodes a color from a string.
+     * @param data The string to decode.
+     */
     void decode(const std::string& data);
+    /**
+     * @brief Decodes a color from an input string stream.
+     * @param stream The input string stream.
+     */
     void decode(std::istringstream& stream);
-
+    /**
+     * @brief Interpolates between this color and another color.
+     * @param other The other color.
+     * @param t The interpolation factor (0.0 to 1.0).
+     * @return The interpolated color.
+     */
     Color interpolateWith(const Color& other, float t) const {
       Color result;
       for (int i = 0; i < kNumChannels; ++i)
@@ -339,16 +516,26 @@ namespace visage {
       result.hdr_ = hdr_ + (other.hdr_ - hdr_) * t;
       return result;
     }
-
+    /**
+     * @brief Creates a new color with a different alpha value.
+     * @param alpha The new alpha value.
+     * @return The new color.
+     */
     Color withAlpha(float alpha) const {
       return { alpha, values_[kRed], values_[kGreen], values_[kBlue], hdr_ };
     }
-
+    /**
+     * @brief Converts the color to an ARGB hex string.
+     * @return The ARGB hex string.
+     */
     std::string toARGBHexString() const {
       return floatToHexString(values_[kAlpha]) + floatToHexString(values_[kRed]) +
              floatToHexString(values_[kGreen]) + floatToHexString(values_[kBlue]);
     }
-
+    /**
+     * @brief Converts the color to an RGB hex string.
+     * @return The RGB hex string.
+     */
     std::string toRGBHexString() const {
       return floatToHexString(values_[kRed]) + floatToHexString(values_[kGreen]) +
              floatToHexString(values_[kBlue]);
