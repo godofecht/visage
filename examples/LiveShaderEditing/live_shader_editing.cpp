@@ -27,6 +27,12 @@
 
 using namespace visage::dimension;
 
+// This example demonstrates how to use the ShaderEditor widget to enable live editing
+// of a GLSL post-processing shader.
+
+// --- Helper Drawing Functions ---
+// These functions just create an interesting animated background for the shader to process.
+
 static void drawRing(visage::Canvas& canvas, int width, int height, float radius,
                      float circle_diameter, int num, float phase_offset) {
   static constexpr float kPi = 3.14159265358979323846f;
@@ -57,29 +63,42 @@ static void drawRotatingCircles(visage::Canvas& canvas, int width, int height) {
   }
 }
 
+// The main application window for this example.
 class ExampleEditor : public visage::ApplicationWindow {
 public:
   ExampleEditor() {
+    // The `shapes_` frame will contain the animated graphics.
     shapes_.onDraw() = [this](visage::Canvas& canvas) {
       drawRotatingCircles(canvas, shapes_.width(), shapes_.height());
-      shapes_.redraw();
+      shapes_.redraw(); // Continuously redraw for animation.
     };
 
+    // Create a post-processing effect from a GLSL vertex and fragment shader.
+    // The shaders are loaded from the embedded resources.
     post_effect_ = std::make_unique<visage::ShaderPostEffect>(resources::shaders::vs_custom,
                                                               resources::shaders::fs_warp);
 
+    // The ShaderEditor widget provides a text editor for the shader source code.
+    // When the code is changed and compiled, it automatically updates any ShaderPostEffect
+    // that was created with the same shader source.
+    // The `.sc` file is the SPIR-V cross-compiled version for Metal.
     shader_editor_.setShader(resources::shaders::fs_warp, resources::shaders::fs_warp_sc);
 
+    // Apply the post-processing effect to the `shapes_` frame.
     shapes_.setPostEffect(post_effect_.get());
+
+    // Add the frames to the window.
     addChild(&shapes_);
     addChild(&shader_editor_);
   }
 
+  // Draw a background for the area not covered by the main frames.
   void draw(visage::Canvas& canvas) override {
     canvas.setColor(0xff000000);
     canvas.fill(0, 0, shader_editor_.x(), height());
   }
 
+  // Set the layout of the shapes frame and the shader editor.
   void resized() override {
     float center = width() / 2.0f;
     int shapes_width = std::min(center, height());

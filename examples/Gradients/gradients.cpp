@@ -32,6 +32,12 @@
 
 using namespace visage::dimension;
 
+// This example demonstrates how to create and use various gradients.
+// It includes perceptually uniform colormaps like Viridis and OkLab.
+
+// --- Colormap Definitions ---
+
+// A pre-computed table of colors for the Viridis colormap.
 static constexpr unsigned int kViridisMapResolution = 128;
 static constexpr unsigned int kViridisMap[kViridisMapResolution] = {
   0xFF440154, 0xFF450457, 0xFF46075A, 0xFF460A5D, 0xFF470D60, 0xFF471063, 0xFF471365, 0xFF481668,
@@ -52,21 +58,27 @@ static constexpr unsigned int kViridisMap[kViridisMapResolution] = {
   0xFFDAE319, 0xFFDFE318, 0xFFE4E419, 0xFFEAE41A, 0xFFEFE51C, 0xFFF4E61E, 0xFFF8E621, 0xFFFDE725
 };
 
+// A sampling function to create a Gradient from the Viridis color table.
 visage::Color sampleViridis(float t) {
   int index = std::clamp<int>(std::round((1.0f - t) * (kViridisMapResolution - 1)), 0,
                               kViridisMapResolution - 1);
   return visage::Color(kViridisMap[index]);
 }
 
+// A sampling function that generates a rainbow gradient in the Oklab color space.
+// Oklab is designed to be perceptually uniform, meaning changes in color values
+// correspond to similar-sized changes in visual appearance.
 visage::Color sampleOkLab(float t) {
   static constexpr float kPi = 3.14159265358979323846f;
   static constexpr float kL = 0.82f;
   static constexpr float kC = 0.15f;
   static constexpr float kOffset = 0.45f;
 
+  // Convert from polar to cartesian coordinates in the a-b plane of Oklab.
   float a = kC * std::cos(2.0f * kPi * t + kOffset);
   float b = kC * std::sin(2.0f * kPi * t + kOffset);
 
+  // Oklab to LMS color space conversion (cone fundamentals).
   float l_ = kL + 0.3963377774f * a + 0.2158037573f * b;
   float m_ = kL - 0.1055613458f * a - 0.0638541728f * b;
   float s_ = kL - 0.0894841775f * a - 1.2914855480f * b;
@@ -75,42 +87,50 @@ visage::Color sampleOkLab(float t) {
   float m = m_ * m_ * m_;
   float s = s_ * s_ * s_;
 
+  // LMS to linear sRGB conversion.
   return { 1.0f, +4.0767416621f * l - 3.3077115913f * m + 0.2309699292f * s,
            -1.2684380046f * l + 2.6097574011f * m - 0.3413193965f * s,
            -0.0041960863f * l - 0.7034186147f * m + 1.7076147010f * s };
 }
 
+// Helper function to configure a Gradient's wrapping behavior based on a string name.
 void setPattern(visage::Gradient& gradient, const std::string& pattern) {
   if (pattern == "Single") {
-    gradient.setRepeat(false);
+    gradient.setRepeat(false); // The gradient is drawn once.
     gradient.setReflect(false);
   }
   else if (pattern == "Repeat") {
-    gradient.setRepeat(true);
+    gradient.setRepeat(true); // The gradient repeats itself.
     gradient.setReflect(false);
   }
-  else {
+  else { // Reflect
     gradient.setRepeat(false);
-    gradient.setReflect(true);
+    gradient.setReflect(true); // The gradient reflects back and forth (mirrored).
   }
 }
 
+// --- Interactive Gradient Frames ---
+
+// A base class for the interactive frames that display gradients.
+// It handles drawing and dragging the two control points that define the gradient's geometry.
 class PointsFrame : public visage::Frame {
 public:
   static constexpr int kDragRadius = 20;
   static constexpr int kDotRadius = 5;
   enum ActivePoint {
     kNone,
-    kFrom,
-    kTo
+    kFrom, // The start point of the gradient
+    kTo    // The end point of the gradient
   };
 
   void resized() override {
+    // Initialize the control points based on the frame's size.
     point1_ = visage::Point(width() * 0.33f, height() * 0.33f);
     point2_ = visage::Point(width() * 0.66f, height() * 0.66f);
   }
 
   void draw(visage::Canvas& canvas) override {
+    // This base class draw method is overridden by subclasses, but provides a simple default.
     visage::Brush points = visage::Brush::linear(visage::Gradient(0xffffff00, 0xff00ffff), point1_, point2_);
     canvas.setColor(points);
     canvas.roundedRectangle(0, 0, width(), height(), 18.0f);
@@ -119,10 +139,10 @@ public:
     visage::Font font(20, resources::fonts::Lato_Regular_ttf);
     canvas.text("Linear Points", font, visage::Font::kCenter, 0, 0, width(), height());
 
+    // Draw visual feedback for the draggable points.
     canvas.setColor(mouse_down_ ? 0xaaffffff : 0x66ffffff);
     if (active_point_ == kFrom)
       canvas.circle(point1_.x - kDragRadius, point1_.y - kDragRadius, 2.0f * kDragRadius);
-
     else if (active_point_ == kTo)
       canvas.circle(point2_.x - kDragRadius, point2_.y - kDragRadius, 2.0f * kDragRadius);
 
@@ -131,10 +151,11 @@ public:
     canvas.circle(point2_.x - kDotRadius, point2_.y - kDotRadius, 2.0f * kDotRadius);
   }
 
+  // --- Mouse Event Handling for Dragging Points ---
+
   void setActivePoint(ActivePoint active_point) {
     if (active_point == active_point_)
       return;
-
     active_point_ = active_point;
     redraw();
   }
@@ -144,6 +165,7 @@ public:
     visage::Point delta_from = point - point1_;
     visage::Point delta_to = point - point2_;
 
+    // Determine which control point is being hovered over.
     if (delta_from.squareMagnitude() < kDragRadius * kDragRadius &&
         delta_from.squareMagnitude() < delta_to.squareMagnitude())
       setActivePoint(kFrom);
@@ -156,7 +178,6 @@ public:
   void mouseDown(const visage::MouseEvent& e) override {
     if (active_point_ == kNone)
       return;
-
     mouse_down_ = true;
     redraw();
   }
@@ -164,7 +185,6 @@ public:
   void mouseUp(const visage::MouseEvent& e) override {
     if (active_point_ == kNone)
       return;
-
     mouse_down_ = false;
     redraw();
   }
@@ -172,13 +192,15 @@ public:
   void mouseDrag(const visage::MouseEvent& e) override {
     if (active_point_ == kNone)
       return;
-
+    // Update the position of the active control point.
     if (active_point_ == kFrom)
       point1_ = localBounds().clampPoint(e.position);
     else if (active_point_ == kTo)
       point2_ = localBounds().clampPoint(e.position);
     redraw();
   }
+
+  // --- Public Setters ---
 
   void setGradient(const visage::Gradient& gradient) {
     gradient_ = gradient;
@@ -199,13 +221,17 @@ protected:
   visage::Gradient gradient_;
 };
 
+// A specialization of PointsFrame that draws a linear gradient.
 class LinearPointsFrame : public PointsFrame {
 public:
   void draw(visage::Canvas& canvas) override {
+    // Create a linear brush using the current gradient and the two control points.
+    // The gradient will stretch between point1 and point2.
     visage::Brush points = visage::Brush::linear(gradient_, point1_, point2_);
     canvas.setColor(points);
     canvas.roundedRectangle(0, 0, width(), height(), 18.0f);
 
+    // Draw the descriptive text and the control points.
     canvas.setColor(0xff000000);
     visage::Font font(20, resources::fonts::Lato_Regular_ttf);
     canvas.text("Linear Gradient", font, visage::Font::kCenter, 0, 0, width(), height());
@@ -213,7 +239,6 @@ public:
     canvas.setColor(mouse_down_ ? 0xaaffffff : 0x66ffffff);
     if (active_point_ == kFrom)
       canvas.circle(point1_.x - kDragRadius, point1_.y - kDragRadius, 2.0f * kDragRadius);
-
     else if (active_point_ == kTo)
       canvas.circle(point2_.x - kDragRadius, point2_.y - kDragRadius, 2.0f * kDragRadius);
 
@@ -223,14 +248,18 @@ public:
   }
 };
 
+// A specialization of PointsFrame that draws a radial gradient.
 class RadialPointsFrame : public PointsFrame {
 public:
   void draw(visage::Canvas& canvas) override {
+    // The radius of the radial gradient is the distance between the two control points.
     auto radius = (point2_ - point1_).length();
+    // Create a radial brush. The gradient will emanate from point1 out to the calculated radius.
     visage::Brush radial = visage::Brush::radial(gradient_, point1_, radius);
     canvas.setColor(radial);
     canvas.roundedRectangle(0, 0, width(), height(), 18.0f);
 
+    // Draw the descriptive text and the control points.
     canvas.setColor(0xff000000);
     visage::Font font(20, resources::fonts::Lato_Regular_ttf);
     canvas.text("Radial Gradient", font, visage::Font::kCenter, 0, 0, width(), height());
@@ -238,7 +267,6 @@ public:
     canvas.setColor(mouse_down_ ? 0xaaffffff : 0x66ffffff);
     if (active_point_ == kFrom)
       canvas.circle(point1_.x - kDragRadius, point1_.y - kDragRadius, 2.0f * kDragRadius);
-
     else if (active_point_ == kTo)
       canvas.circle(point2_.x - kDragRadius, point2_.y - kDragRadius, 2.0f * kDragRadius);
 
@@ -251,10 +279,13 @@ public:
 int runExample() {
   visage::ApplicationWindow app;
 
+  // --- UI Layout Setup ---
+  // The main window uses a vertical flexbox layout.
   app.layout().setFlex(true);
   app.layout().setFlexGap(8);
   app.layout().setPadding(8);
 
+  // A frame to hold the two gradient displays, arranged horizontally.
   visage::Frame gradients;
   gradients.layout().setFlex(true);
   gradients.layout().setFlexRows(false);
@@ -262,23 +293,28 @@ int runExample() {
   gradients.layout().setFlexGrow(1.0f);
   app.addChild(gradients);
 
+  // Set a dark background for the main window.
   app.onDraw() = [&app](visage::Canvas& canvas) {
     canvas.setColor(0xff222222);
     canvas.fill(0, 0, app.width(), app.height());
   };
 
+  // The initial gradient to be displayed.
   visage::Gradient gradient(0xffffff00, 0xff00aaff);
 
+  // Create and add the linear gradient display.
   std::unique_ptr<PointsFrame> linear_points_frame = std::make_unique<LinearPointsFrame>();
   gradients.addChild(linear_points_frame.get());
   linear_points_frame->layout().setFlexGrow(1.0f);
   linear_points_frame->setGradient(gradient);
 
+  // Create and add the radial gradient display.
   std::unique_ptr<PointsFrame> radial_points_frame = std::make_unique<RadialPointsFrame>();
   gradients.addChild(radial_points_frame.get());
   radial_points_frame->layout().setFlexGrow(1.0f);
   radial_points_frame->setGradient(gradient);
 
+  // --- Control Buttons ---
   visage::Font font(20, resources::fonts::Lato_Regular_ttf);
   visage::Frame controls;
   controls.layout().setFlexGrow(0.15f);
@@ -286,6 +322,7 @@ int runExample() {
   controls.layout().setFlexRows(false);
   controls.layout().setFlexGap(8);
 
+  // Button to cycle through gradient wrapping patterns (Single, Repeat, Reflect).
   std::string pattern = "Single";
   visage::UiButton pattern_button("Pattern: " + pattern);
   pattern_button.setFont(font);
@@ -306,14 +343,17 @@ int runExample() {
     pattern_button.setText("Pattern: " + pattern);
   };
 
+  // A map of available gradients to cycle through.
   std::map<std::string, visage::Gradient> gradients_map = {
     { "Two Color", visage::Gradient(0xffffff00, 0xff00aaff) },
     { "Rainbow", visage::Gradient(0xffff0000, 0xffffff00, 0xff00ff00, 0xff00ffff, 0xff0000ff,
                                   0xffff00ff, 0xffff0000) },
+    // Gradients can also be created from a sampling function.
     { "Rainbow (OkLab)", visage::Gradient::fromSampleFunction(100, sampleOkLab) },
     { "Viridis", visage::Gradient::fromSampleFunction(kViridisMapResolution, sampleViridis) }
   };
 
+  // Button to cycle through the different gradient color maps.
   visage::UiButton color_button("Gradient: Two Color");
   color_button.setFont(font);
   color_button.layout().setFlexGrow(1.0f);
@@ -333,7 +373,9 @@ int runExample() {
     color_button.setText("Gradient: " + gradient_it->first);
   };
 
+  // --- Window Setup ---
   app.setTitle("Visage Gradient Example");
+  // Use viewport-relative units to set the initial window size.
   app.show(80_vmin, 60_vmin);
   app.runEventLoop();
   return 0;

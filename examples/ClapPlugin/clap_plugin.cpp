@@ -27,8 +27,10 @@
 
 using namespace visage::dimension;
 
+// Define the features of this plugin. This one is an "instrument".
 static const char* kClapFeatures[] = { CLAP_PLUGIN_FEATURE_INSTRUMENT, nullptr };
 
+// Initialize the static plugin descriptor.
 clap_plugin_descriptor ClapPlugin::descriptor = { CLAP_VERSION,          "dev.visage.example",
                                                   "Example Clap Plugin", "Visage",
                                                   "visage.dev",          "visage.dev",
@@ -40,12 +42,16 @@ ClapPlugin::ClapPlugin(const clap_host* host) : ClapPluginBase(&descriptor, host
 ClapPlugin::~ClapPlugin() = default;
 
 #ifdef __linux__
+// On Linux, the host may ask the plugin to register its file descriptor
+// to be managed by the host's event loop.
 void ClapPlugin::onPosixFd(int fd, clap_posix_fd_flags_t flags) noexcept {
   if (app_ && app_->window())
+    // `processPluginFdEvents` tells the Visage window to handle any pending events.
     app_->window()->processPluginFdEvents();
 }
 #endif
 
+// Check for the supported native windowing API (e.g., Win32, Cocoa, X11).
 bool ClapPlugin::guiIsApiSupported(const char* api, bool is_floating) noexcept {
   if (is_floating)
     return false;
@@ -64,6 +70,7 @@ bool ClapPlugin::guiIsApiSupported(const char* api, bool is_floating) noexcept {
   return false;
 }
 
+// This is where the Visage UI is created and configured.
 bool ClapPlugin::guiCreate(const char* api, bool is_floating) noexcept {
   if (is_floating)
     return false;
@@ -71,9 +78,11 @@ bool ClapPlugin::guiCreate(const char* api, bool is_floating) noexcept {
   if (app_)
     return true;
 
+  // Create an ApplicationWindow, which will manage the drawing and event handling.
   app_ = std::make_unique<visage::ApplicationWindow>();
   app_->setWindowDimensions(80_vmin, 60_vmin);
 
+  // Set up a simple draw callback, just like in the standalone examples.
   app_->onDraw() = [this](visage::Canvas& canvas) {
     canvas.setColor(0xff000066);
     canvas.fill(0, 0, app_->width(), app_->height());
@@ -85,13 +94,17 @@ bool ClapPlugin::guiCreate(const char* api, bool is_floating) noexcept {
     canvas.circle(x, y, 2.0f * circle_radius);
   };
 
+  // When the plugin's content is resized (e.g., by the user),
+  // we need to notify the host so it can adjust the parent window.
   app_->onWindowContentsResized() = [this] { _host.guiRequestResize(pluginWidth(), pluginHeight()); };
 
   return true;
 }
 
+// Clean up the Visage UI.
 void ClapPlugin::guiDestroy() noexcept {
 #if __linux__
+  // Unregister the file descriptor on Linux.
   if (app_ && app_->window() && _host.canUsePosixFdSupport())
     _host.posixFdSupportUnregister(app_->window()->posixFd());
 #endif
@@ -99,6 +112,8 @@ void ClapPlugin::guiDestroy() noexcept {
   app_->close();
 }
 
+// The host provides a native window handle. Visage's `show` method can accept this
+// handle and embed the Visage content within the host's window.
 bool ClapPlugin::guiSetParent(const clap_window* window) noexcept {
   if (app_ == nullptr)
     return false;
@@ -106,6 +121,7 @@ bool ClapPlugin::guiSetParent(const clap_window* window) noexcept {
   app_->show(window->ptr);
 
 #if __linux__
+  // Register the file descriptor on Linux.
   if (_host.canUsePosixFdSupport() && app_->window()) {
     int fd_flags = CLAP_POSIX_FD_READ | CLAP_POSIX_FD_WRITE | CLAP_POSIX_FD_ERROR;
     return _host.posixFdSupportRegister(app_->window()->posixFd(), fd_flags);

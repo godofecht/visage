@@ -22,16 +22,20 @@
 #include <visage/app.h>
 #include <visage_ui/popup_menu.h>
 
+// This example demonstrates how to handle various mouse events by overriding
+// the virtual methods in the ApplicationWindow class.
 class ExampleEditor : public visage::ApplicationWindow {
 public:
+  // The draw method is called for each frame. It draws a circle at the current
+  // mouse position. The circle's color changes when a mouse button is held down.
   void draw(visage::Canvas& canvas) override {
     static constexpr float kRadius = 30.0f;
     canvas.setColor(0xff000000);
     canvas.fill(0, 0, width(), height());
     if (down_)
-      canvas.setColor(0xff00ffff);
+      canvas.setColor(0xff00ffff); // Cyan when mouse is down
     else
-      canvas.setColor(0xffffffff);
+      canvas.setColor(0xffffffff); // White when mouse is up
     canvas.circle(x_ - kRadius, y_ - kRadius, 2.0f * kRadius);
   }
 
@@ -46,25 +50,40 @@ public:
     redraw();
   }
 
+  // --- Mouse Event Overrides ---
+
+  // Called when the mouse is moved over the window.
   void mouseMove(const visage::MouseEvent& e) override { setPosition(e.position); }
+  // Called when the mouse is moved while a button is held down.
   void mouseDrag(const visage::MouseEvent& e) override { setPosition(e.position); }
+  // Called when the mouse cursor leaves the window area.
   void mouseExit(const visage::MouseEvent& e) override { setPosition({ -100, -100 }); }
+  // Called when a mouse button is pressed.
   void mouseDown(const visage::MouseEvent& e) override {
+    // This demonstrates relative mouse mode, which is useful for things like FPS controls.
+    // The cursor is hidden, and mouse movements report deltas rather than absolute positions.
     if (e.isMiddleButton()) {
       setMouseRelativeMode(true);
       setCursorVisible(false);
     }
 
+    // Right-clicking (or Ctrl+click on macOS) typically shows a context menu.
+    // The `shouldTriggerPopup()` method checks for this.
     if (!e.shouldTriggerPopup()) {
       setDown(true);
       return;
     }
+
+    // Show a popup menu on right-click.
     visage::PopupMenu menu;
     menu.addOption(1, "Option 1");
     menu.addOption(2, "Option 2");
     menu.show(this, { x_, y_ });
   }
+
+  // Called when a mouse button is released.
   void mouseUp(const visage::MouseEvent& e) override {
+    // Exit relative mouse mode when the middle button is released.
     if (e.isMiddleButton()) {
       setCursorVisible(true);
       setMouseRelativeMode(false);

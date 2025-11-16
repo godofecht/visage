@@ -28,6 +28,12 @@
 
 using namespace visage::dimension;
 
+// This example demonstrates two types of full-screen effects:
+// 1. Post-processing effects: Applied to a Frame and all its children. The content
+//    is rendered to a texture, the effect is applied, and then it's drawn to the screen.
+// 2. Backdrop effects: Applied to a Frame, which filters the content already drawn *behind* it.
+
+// Helper function to draw a ring of circles.
 static void drawRing(visage::Canvas& canvas, int width, int height, float radius,
                      float circle_diameter, int num, float phase_offset) {
   static constexpr float kPi = 3.14159265358979323846f;
@@ -44,6 +50,7 @@ static void drawRing(visage::Canvas& canvas, int width, int height, float radius
   }
 }
 
+// A simple UI component with buttons to select the active post-processing effect.
 class PostEffectSelector : public visage::Frame {
 public:
   enum PostEffect {
@@ -91,12 +98,15 @@ private:
   std::function<void(PostEffect)> on_effect_change_;
 };
 
+// The main application window for this example.
 class ExampleEditor : public visage::ApplicationWindow {
 public:
   static constexpr float kBackdropWidth = 300.0f;
 
   ExampleEditor() {
     setReceiveChildMouseEvents(true);
+
+    // This frame contains the animated shapes that the post-processing effects will be applied to.
     shapes_.onDraw() = [this](visage::Canvas& canvas) {
       float width = shapes_.width();
       float height = shapes_.height();
@@ -109,22 +119,28 @@ public:
       shapes_.redraw();
     };
 
+    // --- Post-Processing Effect Definitions ---
+    // These effects are created once and can be swapped in and out.
+
+    // ShaderPostEffect allows for custom effects using GLSL fragment shaders.
+    // The shaders are embedded into the binary.
     gray_scale_ = std::make_unique<visage::ShaderPostEffect>(resources::shaders::vs_custom,
                                                              resources::shaders::fs_gray_scale);
-
     sepia_ = std::make_unique<visage::ShaderPostEffect>(resources::shaders::vs_custom,
                                                         resources::shaders::fs_sepia);
-
     glitch_ = std::make_unique<visage::ShaderPostEffect>(resources::shaders::vs_custom,
                                                          resources::shaders::fs_glitch);
-
+    // BlurPostEffect is a built-in effect.
     blur_ = std::make_unique<visage::BlurPostEffect>();
     blur_->setBlurRadius(40.0f);
 
+    // Add the frames to the main window.
     addChild(shapes_);
     addChild(selector_);
     addChild(blur_glass_);
 
+    // Set the callback for the effect selector UI.
+    // This lambda is called when a button is clicked, and it applies the selected effect.
     selector_.setCallback([this](PostEffectSelector::PostEffect effect) {
       if (effect == PostEffectSelector::kNone)
         shapes_.setPostEffect(nullptr);
@@ -138,13 +154,19 @@ public:
         shapes_.setPostEffect(blur_.get());
     });
 
+    // --- Backdrop Effect Setup ---
+    // The "blur_glass_" frame will have a backdrop effect, meaning it will blur
+    // whatever is drawn behind it (in this case, the `shapes_` frame).
     blur_glass_.setBackdropEffect(&blur_backdrop_);
     blur_backdrop_.setBlurRadius(40.0f);
 
+    // The draw call for the glass frame itself. It draws a semi-transparent overlay
+    // and a border to make the effect more visually apparent.
     blur_glass_.onDraw() = [&](visage::Canvas& canvas) {
       canvas.setColor(0x22ffffff);
       canvas.fill(0, 0, blur_glass_.width(), blur_glass_.height());
 
+      // The frame is masked to a rounded rectangle shape.
       canvas.setBlendMode(visage::BlendMode::MaskRemove);
       canvas.setColor(0xffffffff);
       canvas.fill(0, 0, blur_glass_.width(), blur_glass_.height());
@@ -154,6 +176,7 @@ public:
       canvas.roundedRectangle(0, 0, blur_glass_.width(), blur_glass_.height(),
                               0.5f * std::min(blur_glass_.width(), blur_glass_.height()));
 
+      // Draw a border and text on top of the blurred backdrop.
       canvas.setBlendMode(visage::BlendMode::Alpha);
       canvas.setColor(visage::Brush::vertical(0x44ffffff, 0x44000000));
       canvas.roundedRectangleBorder(0, 0, blur_glass_.width(), blur_glass_.height(),
@@ -164,6 +187,7 @@ public:
                   blur_glass_.height());
     };
 
+    // --- Mouse Handling for the Draggable Glass Frame ---
     onMouseDrag() = [&](const visage::MouseEvent& e) {
       if (e.event_frame != &blur_glass_)
         return;
@@ -187,6 +211,7 @@ public:
     canvas.fill(0, 0, width(), height());
   }
 
+  // Handle window resizing by repositioning the main UI elements.
   void resized() override {
     float center = width() / 2.0f;
     float shapes_width = std::min(center, height());

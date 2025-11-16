@@ -30,15 +30,23 @@
 
 using namespace visage::dimension;
 
+// --- Custom Theme Definition ---
+// The VISAGE_THEME_COLOR and VISAGE_THEME_VALUE macros define custom properties
+// that can be used throughout the application. These values are stored in the
+// Palette and can be edited at runtime by the PaletteEditor widgets.
+
+// Define custom theme colors.
 VISAGE_THEME_COLOR(BackgroundColor, 0xff33393f);
 VISAGE_THEME_COLOR(OverlayBody, 0xff212529);
 VISAGE_THEME_COLOR(OverlayBorder, 0x66ffffff);
 
+// Define custom theme numerical values.
 VISAGE_THEME_VALUE(BloomSize, 25.0f);
 VISAGE_THEME_VALUE(BloomIntensity, 3.0f);
 VISAGE_THEME_VALUE(BlurSize, 80.0f);
 VISAGE_THEME_VALUE(OverlayRounding, 25.0f);
 
+// A simple frame to display debugging information from the canvas.
 class DebugInfo : public visage::Frame {
 public:
   DebugInfo() { setIgnoresMouseEvents(true, true); }
@@ -60,6 +68,8 @@ public:
   }
 };
 
+// --- Overlay Implementation ---
+
 Overlay::Overlay() :
     animation_(visage::Animation<float>::kRegularTime, visage::Animation<float>::kLinear,
                visage::Animation<float>::kLinear) {
@@ -70,10 +80,12 @@ Overlay::Overlay() :
 void Overlay::resized() { }
 
 void Overlay::draw(visage::Canvas& canvas) {
+  // Update the animation value for the overlay's appearance.
   float overlay_amount = animation_.update();
   if (!animation_.isTargeting() && overlay_amount == 0.0f)
-    setVisible(false);
+    setVisible(false); // Hide the frame when fully faded out.
 
+  // Draw the body and border of the overlay, using theme colors from the palette.
   visage::Bounds body = bodyBounds();
   float rounding = bodyRounding();
   canvas.setColor(OverlayBody);
@@ -82,6 +94,7 @@ void Overlay::draw(visage::Canvas& canvas) {
   canvas.setColor(OverlayBorder);
   canvas.roundedRectangleBorder(body.x(), body.y(), body.width(), body.height(), rounding, 1.0f);
 
+  // Fire the animation callback, which allows other parts of the UI to react.
   on_animate_.callback(overlay_amount);
 
   if (animation_.isAnimating())
@@ -99,35 +112,45 @@ float Overlay::bodyRounding() {
   return paletteValue(OverlayRounding);
 }
 
+// --- Showcase Implementation ---
+
 Showcase::Showcase() : palette_color_window_(&palette_), palette_value_window_(&palette_) {
   setIgnoresMouseEvents(true, true);
   setAcceptsKeystrokes(true);
 
+  // Initialize the palette with the default theme values.
   palette_.initWithDefaults();
   setPalette(&palette_);
 
+  // Create the main frame that contains all the example widgets.
   examples_ = std::make_unique<ExamplesFrame>();
   examples_->onShowOverlay() = [this] { overlay_.setVisible(true); };
   examples_->onToggleDebug() = [this] { toggleDebug(); };
 
+  // Set up a callback to handle screenshot requests from the examples frame.
   examples_->onScreenshot() = [this](const std::string& file_path) {
     visage::ApplicationEditor* parent = findParent<visage::ApplicationEditor>();
     if (parent)
       parent->takeScreenshot().save(file_path);
   };
-
   addChild(examples_.get());
+
+  // Create and configure the post-processing effect for the overlay.
   overlay_zoom_ = std::make_unique<visage::ShaderPostEffect>(resources::shaders::vs_overlay,
                                                              resources::shaders::fs_overlay);
   overlay_.setPostEffect(overlay_zoom_.get());
   addChild(&overlay_, false);
+  // The overlay's animation callback drives the parameters of the effects.
   overlay_.onAnimate() = [this](float overlay_amount) {
     static constexpr float kMaxZoom = 0.075f;
+    // Blur the main content behind the overlay.
     examples_->setBlurRadius(paletteValue(BlurSize) * overlay_amount);
+    // Animate the zoom and alpha uniforms of the overlay's shader.
     overlay_zoom_->setUniformValue("u_zoom", kMaxZoom * (1.0f - overlay_amount) + 1.0f);
     overlay_zoom_->setUniformValue("u_alpha", overlay_amount * overlay_amount);
   };
 
+  // Create the debug info panel.
   debug_info_ = std::make_unique<DebugInfo>();
   addChild(debug_info_.get());
   debug_info_->setOnTop(true);
