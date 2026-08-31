@@ -29,6 +29,11 @@
 #include <vector>
 
 namespace visage {
+  /**
+   * @struct BasePoint
+   * @brief A template for a 2D point with coordinates of a generic type.
+   * @tparam T The numeric type for the coordinates (e.g., int, float, double).
+   */
   template<typename T>
   struct BasePoint {
     T x = 0;
@@ -131,7 +136,11 @@ namespace visage {
         return BasePoint<int64_t>(std::round(x), std::round(y));
     }
   };
-
+  /**
+   * @struct BaseMatrix
+   * @brief A template for a 2x2 matrix for 2D transformations.
+   * @tparam T The numeric type for the matrix elements (e.g., int, float, double).
+   */
   template<typename T>
   struct BaseMatrix {
     static constexpr auto kPi = std::is_same_v<T, float> ? 3.14159265358979323846f : 3.14159265358979323846;
@@ -198,7 +207,11 @@ namespace visage {
       return { matrix[1][1] / det, -matrix[0][1] / det, -matrix[1][0] / det, matrix[0][0] / det };
     }
   };
-
+  /**
+   * @struct BaseTransform
+   * @brief Represents a 2D affine transformation, combining a matrix and a translation.
+   * @tparam T The numeric type for the transform elements (e.g., int, float, double).
+   */
   template<typename T>
   struct BaseTransform {
     BaseMatrix<T> matrix;
@@ -277,7 +290,10 @@ namespace visage {
   typedef BaseTransform<float> Transform;
   typedef BaseTransform<double> DTransform;
   typedef BaseTransform<int64_t> ITransform64;
-
+  /**
+   * @class IBounds
+   * @brief Represents a rectangle with integer coordinates and dimensions.
+   */
   class IBounds {
   public:
     IBounds() = default;
@@ -465,7 +481,10 @@ namespace visage {
     int width_ = 0;
     int height_ = 0;
   };
-
+  /**
+   * @class Bounds
+   * @brief Represents a rectangle with floating-point coordinates and dimensions.
+   */
   class Bounds {
   public:
     Bounds() = default;

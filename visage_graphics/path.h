@@ -58,18 +58,31 @@ namespace visage {
 
     return orientation(target1, target2, source);
   }
-
+  /**
+   * @class Path
+   * @brief Represents a 2D path made up of lines and curves.
+   *
+   * This class provides a powerful API for creating, manipulating, and rendering
+   * complex 2D paths. It supports various path commands, transformations,
+   * boolean operations, and triangulation.
+   */
   class Path {
   public:
     static constexpr float kDefaultErrorTolerance = 0.1f;
     static constexpr float kDefaultMiterLimit = 4.0f;
-
+    /**
+     * @struct SubPath
+     * @brief Represents a single contiguous sub-path.
+     */
     struct SubPath {
       std::vector<Point> points;
       std::vector<float> values;
       bool closed = false;
     };
-
+    /**
+     * @struct Command
+     * @brief Represents a single path command.
+     */
     struct Command {
       char type;
       Point end;
@@ -77,7 +90,10 @@ namespace visage {
       Point control2 { FLT_MAX, FLT_MAX };
       int flags = 0;
     };
-
+    /**
+     * @struct CommandList
+     * @brief A list of path commands.
+     */
     struct CommandList : std::vector<Command> {
       enum Flags {
         kLargeArc = 1,
@@ -93,43 +109,99 @@ namespace visage {
         current = command.end;
         push_back(std::move(command));
       }
-
+      /**
+       * @brief Moves the current point to a new position.
+       * @param x The new x-coordinate.
+       * @param y The new y-coordinate.
+       * @param relative If true, the coordinates are relative to the current point.
+       */
       void moveTo(float x, float y, bool relative = false) {
         addCommand({ 'M', adjustPoint(x, y, relative) });
         start = current;
       }
 
       void moveTo(Point p, bool relative = false) { moveTo(p.x, p.y, relative); }
-
+      /**
+       * @brief Draws a line from the current point to a new position.
+       * @param x The new x-coordinate.
+       * @param y The new y-coordinate.
+       * @param relative If true, the coordinates are relative to the current point.
+       */
       void lineTo(float x, float y, bool relative = false) {
         addCommand({ 'L', adjustPoint(x, y, relative) });
       }
-
+      /**
+       * @brief Draws a horizontal line from the current point to a new x-coordinate.
+       * @param x The new x-coordinate.
+       * @param relative If true, the coordinate is relative to the current point.
+       */
       void horizontalTo(float x, bool relative = false) {
         addCommand({ 'L', { relative ? x + current.x : x, current.y } });
       }
-
+      /**
+       * @brief Draws a vertical line from the current point to a new y-coordinate.
+       * @param y The new y-coordinate.
+       * @param relative If true, the coordinate is relative to the current point.
+       */
       void verticalTo(float y, bool relative = false) {
         addCommand({ 'L', { current.x, relative ? y + current.y : y } });
       }
-
+      /**
+       * @brief Draws a quadratic Bezier curve.
+       * @param cx The x-coordinate of the control point.
+       * @param cy The y-coordinate of the control point.
+       * @param x The x-coordinate of the end point.
+       * @param y The y-coordinate of the end point.
+       * @param relative If true, the coordinates are relative to the current point.
+       */
       void quadraticTo(float cx, float cy, float x, float y, bool relative = false) {
         addCommand({ 'Q', adjustPoint(x, y, relative), adjustPoint(cx, cy, relative) });
       }
-
+      /**
+       * @brief Draws a smooth quadratic Bezier curve.
+       * @param x The x-coordinate of the end point.
+       * @param y The y-coordinate of the end point.
+       * @param relative If true, the coordinates are relative to the current point.
+       */
       void smoothQuadraticTo(float x, float y, bool relative = false) {
         addCommand({ 'T', adjustPoint(x, y, relative) });
       }
-
+      /**
+       * @brief Draws a cubic Bezier curve.
+       * @param cx1 The x-coordinate of the first control point.
+       * @param cy1 The y-coordinate of the first control point.
+       * @param cx2 The x-coordinate of the second control point.
+       * @param cy2 The y-coordinate of the second control point.
+       * @param x The x-coordinate of the end point.
+       * @param y The y-coordinate of the end point.
+       * @param relative If true, the coordinates are relative to the current point.
+       */
       void bezierTo(float cx1, float cy1, float cx2, float cy2, float x, float y, bool relative = false) {
         addCommand({ 'C', adjustPoint(x, y, relative), adjustPoint(cx1, cy1, relative),
                      adjustPoint(cx2, cy2, relative) });
       }
-
+      /**
+       * @brief Draws a smooth cubic Bezier curve.
+       * @param cx The x-coordinate of the control point.
+       * @param cy The y-coordinate of the control point.
+       * @param x The x-coordinate of the end point.
+       * @param y The y-coordinate of the end point.
+       * @param relative If true, the coordinates are relative to the current point.
+       */
       void smoothBezierTo(float cx, float cy, float x, float y, bool relative = false) {
         addCommand({ 'S', adjustPoint(x, y, relative), adjustPoint(cx, cy, relative) });
       }
-
+      /**
+       * @brief Draws an elliptical arc.
+       * @param rx The x-radius of the ellipse.
+       * @param ry The y-radius of the ellipse.
+       * @param rotation The rotation of the ellipse's x-axis.
+       * @param large_arc If true, the larger arc is drawn.
+       * @param sweep If true, the arc is drawn in a "positive-angle" direction.
+       * @param x The x-coordinate of the end point.
+       * @param y The y-coordinate of the end point.
+       * @param relative If true, the coordinates are relative to the current point.
+       */
       void arcTo(float rx, float ry, float rotation, bool large_arc, bool sweep, float x, float y,
                  bool relative = false) {
         int flags = (large_arc ? kLargeArc : 0) | (sweep ? kSweep : 0);
@@ -140,7 +212,9 @@ namespace visage {
                  bool relative = false) {
         arcTo(rx, ry, rotation, large_arc, sweep, p.x, p.y, relative);
       }
-
+      /**
+       * @brief Closes the current sub-path.
+       */
       void close() { addCommand({ 'Z', start }); }
 
       void addRectangle(float x, float y, float width, float height);
@@ -193,27 +267,39 @@ namespace visage {
       Point start;
       Point current;
     };
-
+    /**
+     * @enum FillRule
+     * @brief Specifies the fill rule for determining which areas are inside a path.
+     */
     enum class FillRule {
       NonZero,
       Positive,
       EvenOdd
     };
-
+    /**
+     * @enum Operation
+     * @brief Specifies a boolean operation for combining paths.
+     */
     enum class Operation {
       Union,
       Intersection,
       Difference,
       Xor,
     };
-
+    /**
+     * @enum Join
+     * @brief Specifies the style of join for path strokes.
+     */
     enum class Join {
       Round,
       Miter,
       Bevel,
       Square
     };
-
+    /**
+     * @enum EndCap
+     * @brief Specifies the style of end cap for path strokes.
+     */
     enum class EndCap {
       Round,
       Square,
@@ -236,20 +322,41 @@ namespace visage {
       auto t1 = start_delta.cross(delta2) / det;
       return start1 + delta1 * t1;
     }
-
+    /**
+     * @struct Triangulation
+     * @brief Represents the triangulation of a path.
+     */
     struct Triangulation {
       std::vector<Point> points;
       std::vector<uint16_t> triangles;
     };
-
+    /**
+     * @struct AntiAliasTriangulation
+     * @brief Represents the triangulation of a path with anti-aliasing information.
+     */
     struct AntiAliasTriangulation : Triangulation {
       std::vector<float> alphas;
     };
-
+    /**
+     * @brief Parses an SVG path data string into a CommandList.
+     * @param path The SVG path data string.
+     * @return The parsed CommandList.
+     */
     static CommandList parseSvgPath(const std::string& path);
-
+    /**
+     * @brief Sets a value to be associated with subsequent points.
+     * @param value The value to set.
+     */
+    /**
+     * @brief Sets a value to be associated with subsequent points.
+     * @param value The value to set.
+     */
     void setPointValue(float value) { current_value_ = value; }
-
+    /**
+     * @brief Moves the current point to a new position.
+     * @param point The new position.
+     * @param relative If true, the coordinates are relative to the current point.
+     */
     void moveTo(Point point, bool relative = false) {
       if (!paths_.empty() && !paths_.back().points.empty())
         startNewPath();
@@ -262,7 +369,11 @@ namespace visage {
     }
 
     void moveTo(float x, float y, bool relative = false) { moveTo(Point(x, y), relative); }
-
+    /**
+     * @brief Draws a line from the current point to a new position.
+     * @param point The new position.
+     * @param relative If true, the coordinates are relative to the current point.
+     */
     void lineTo(Point point, bool relative = false) {
       if (currentPath().points.empty())
         addPoint(last_point_);
@@ -275,7 +386,11 @@ namespace visage {
     }
 
     void lineTo(float x, float y, bool relative = false) { lineTo(Point(x, y), relative); }
-
+    /**
+     * @brief Draws a vertical line from the current point to a new y-coordinate.
+     * @param y The new y-coordinate.
+     * @param relative If true, the coordinate is relative to the current point.
+     */
     void verticalTo(float y, bool relative = false) {
       if (relative)
         y += last_point_.y;
@@ -283,7 +398,11 @@ namespace visage {
       lineTo(last_point_.x, y);
       smooth_control_point_ = {};
     }
-
+    /**
+     * @brief Draws a horizontal line from the current point to a new x-coordinate.
+     * @param x The new x-coordinate.
+     * @param relative If true, the coordinate is relative to the current point.
+     */
     void horizontalTo(float x, bool relative = false) {
       if (relative)
         x += last_point_.x;
@@ -291,7 +410,9 @@ namespace visage {
       lineTo(x, last_point_.y);
       smooth_control_point_ = {};
     }
-
+    /**
+     * @brief Closes the current sub-path.
+     */
     void close() {
       static constexpr float kCloseEpsilon = 0.000001f;
 
@@ -307,7 +428,12 @@ namespace visage {
 
       currentPath().closed = true;
     }
-
+    /**
+     * @brief Draws a quadratic Bezier curve.
+     * @param control The control point.
+     * @param end The end point.
+     * @param relative If true, the coordinates are relative to the current point.
+     */
     void quadraticTo(Point control, Point end, bool relative = false) {
       if (currentPath().points.empty())
         addPoint(last_point_);
@@ -327,7 +453,11 @@ namespace visage {
     void quadraticTo(float control_x, float control_y, float end_x, float end_y, bool relative = false) {
       quadraticTo(Point(control_x, control_y), Point(end_x, end_y), relative);
     }
-
+    /**
+     * @brief Draws a smooth quadratic Bezier curve.
+     * @param end The end point.
+     * @param relative If true, the coordinates are relative to the current point.
+     */
     void smoothQuadraticTo(Point end, bool relative = false) {
       if (relative)
         end += last_point_;
@@ -338,7 +468,13 @@ namespace visage {
     void smoothQuadraticTo(float end_x, float end_y, bool relative = false) {
       smoothQuadraticTo(Point(end_x, end_y), relative);
     }
-
+    /**
+     * @brief Draws a cubic Bezier curve.
+     * @param control1 The first control point.
+     * @param control2 The second control point.
+     * @param end The end point.
+     * @param relative If true, the coordinates are relative to the current point.
+     */
     void bezierTo(Point control1, Point control2, Point end, bool relative = false) {
       if (currentPath().points.empty())
         addPoint(last_point_);
@@ -357,7 +493,12 @@ namespace visage {
     void bezierTo(float x1, float y1, float x2, float y2, float x3, float y3, bool relative = false) {
       bezierTo(Point(x1, y1), Point(x2, y2), Point(x3, y3), relative);
     }
-
+    /**
+     * @brief Draws a smooth cubic Bezier curve.
+     * @param end_control The second control point of the new curve.
+     * @param end The end point of the new curve.
+     * @param relative If true, the coordinates are relative to the current point.
+     */
     void smoothBezierTo(Point end_control, Point end, bool relative = false) {
       if (relative) {
         end_control += last_point_;
@@ -374,24 +515,43 @@ namespace visage {
 
     void arcTo(float rx, float ry, float x_axis_rotation, bool large_arc, bool sweep_flag,
                Point point, bool relative = false);
-
+    /**
+     * @brief Gets the total number of points in the path.
+     * @return The total number of points.
+     */
     int numPoints() const {
       int count = 0;
       for (const auto& path : paths_)
         count += path.points.size();
       return count;
     }
-
+    /**
+     * @brief Gets the sub-paths of the path.
+     * @return A reference to the vector of sub-paths.
+     */
     std::vector<SubPath>& subPaths() { return paths_; }
+    /**
+     * @brief Gets the sub-paths of the path.
+     * @return A const reference to the vector of sub-paths.
+     */
     const std::vector<SubPath>& subPaths() const { return paths_; }
-
+    /**
+     * @brief Clears the path.
+     */
     void clear() {
       paths_.clear();
       last_point_ = {};
       triangulation_graph_.reset();
     }
-
+    /**
+     * @brief Loads a path from an SVG path data string.
+     * @param path The SVG path data string.
+     */
     void loadSvgPath(const std::string& path);
+    /**
+     * @brief Loads a path from a CommandList.
+     * @param commands The CommandList to load.
+     */
     void loadCommands(const CommandList& commands);
     void addRectangle(float x, float y, float width, float height);
     void addRoundedRectangle(float x, float y, float width, float height, float rx_top_left,
@@ -401,17 +561,64 @@ namespace visage {
     void addRoundedRectangle(float x, float y, float width, float height, float r) {
       addRoundedRectangle(x, y, width, height, r, r);
     }
-
+    /**
+     * @brief Adds an ellipse to the path.
+     * @param cx The x-coordinate of the center.
+     * @param cy The y-coordinate of the center.
+     * @param rx The x-radius.
+     * @param ry The y-radius.
+     */
     void addEllipse(float cx, float cy, float rx, float ry);
+    /**
+     * @brief Adds a circle to the path.
+     * @param cx The x-coordinate of the center.
+     * @param cy The y-coordinate of the center.
+     * @param r The radius.
+     */
     void addCircle(float cx, float cy, float r);
-
+    /**
+     * @brief Triangulates the path.
+     * @return The triangulation of the path.
+     */
     Triangulation triangulate();
+    /**
+     * @brief Combines this path with another path using a boolean operation.
+     * @param other The other path.
+     * @param operation The boolean operation to perform.
+     * @return The resulting path.
+     */
     Path combine(Path& other, Operation operation = Operation::Union);
+    /**
+     * @brief Creates an anti-aliased offset of the path.
+     * @param scale The scaling factor for the offset.
+     * @return The anti-aliased triangulation of the offset path.
+     */
     AntiAliasTriangulation offsetAntiAlias(float scale);
+    /**
+     * @brief Creates an offset of the path.
+     * @param offset The offset distance.
+     * @param join The join style to use.
+     * @param miter_limit The miter limit to use for miter joins.
+     * @return The offset path.
+     */
     Path offset(float offset, Join join = Join::Square, float miter_limit = kDefaultMiterLimit);
+    /**
+     * @brief Creates a stroked version of the path.
+     * @param stroke_width The width of the stroke.
+     * @param join The join style to use.
+     * @param end_cap The end cap style to use.
+     * @param dash_array The dash pattern to use.
+     * @param dash_offset The dash offset to use.
+     * @param miter_limit The miter limit to use for miter joins.
+     * @return The stroked path.
+     */
     Path stroke(float stroke_width, Join join = Join::Round, EndCap end_cap = EndCap::Round,
                 std::vector<float> dash_array = {}, float dash_offset = 0.0f,
                 float miter_limit = kDefaultMiterLimit);
+    /**
+     * @brief Breaks the path into simple polygons.
+     * @return A new path containing the simple polygons.
+     */
     Path breakIntoSimplePolygons();
 
     Path scaled(float mult) const {
@@ -488,16 +695,29 @@ namespace visage {
         std::reverse(path.values.begin(), path.values.end());
       }
     }
-
+    /**
+     * @brief Sets the fill rule for the path.
+     * @param fill_rule The new fill rule.
+     */
     void setFillRule(FillRule fill_rule) { fill_rule_ = fill_rule; }
+    /**
+     * @brief Gets the fill rule for the path.
+     * @return The fill rule.
+     */
     FillRule fillRule() const { return fill_rule_; }
-
+    /**
+     * @brief Sets the error tolerance for path approximation.
+     * @param tolerance The new error tolerance.
+     */
     void setErrorTolerance(float tolerance) {
       VISAGE_ASSERT(tolerance > 0.0f);
       if (tolerance > 0.0f)
         error_tolerance_ = tolerance;
     }
-
+    /**
+     * @brief Gets the bounding box of the path.
+     * @return The bounding box.
+     */
     Bounds boundingBox() const {
       float min_x = std::numeric_limits<float>::max();
       float min_y = std::numeric_limits<float>::max();
@@ -515,8 +735,15 @@ namespace visage {
         return { 0, 0, 0, 0 };
       return { min_x, min_y, max_x - min_x, max_y - min_y };
     }
-
+    /**
+     * @brief Gets the error tolerance for path approximation.
+     * @return The error tolerance.
+     */
     float errorTolerance() const { return error_tolerance_; }
+    /**
+     * @brief Gets the length of the path.
+     * @return The length.
+     */
     float length() const {
       float total_length = 0.0f;
       for (const auto& path : paths_) {
@@ -527,8 +754,15 @@ namespace visage {
       }
       return total_length;
     }
-
+    /**
+     * @brief Sets the resolution matrix for path approximation.
+     * @param matrix The new resolution matrix.
+     */
     void setResolutionMatrix(const Matrix& matrix) { resolution_matrix_ = matrix; }
+    /**
+     * @brief Gets the resolution matrix for path approximation.
+     * @return The resolution matrix.
+     */
     const Matrix& resolutionMatrix() const { return resolution_matrix_; }
 
   private:

@@ -35,35 +35,72 @@ namespace visage {
 #else
   inline void setNativeMenuBar(const PopupMenu& menu) { }
 #endif
-
+  /**
+   * @class PopupMenu
+   * @brief Represents a popup menu with options and sub-menus.
+   */
   class PopupMenu {
   public:
     static constexpr int kNotSet = INT_MIN;
-
+    /**
+     * @brief Default constructor.
+     */
     PopupMenu() = default;
+    /**
+     * @brief Constructs a PopupMenu.
+     * @param name The name of the menu item.
+     * @param id The ID of the menu item.
+     * @param options A vector of sub-menu options.
+     * @param is_break If true, this item is a separator.
+     */
     PopupMenu(const String& name, int id = -1, std::vector<PopupMenu> options = {}, bool is_break = false) :
         name_(name), id_(id), is_break_(is_break), options_(std::move(options)) { }
-
+    /**
+     * @brief Shows the popup menu.
+     * @param source The frame that is the source of the menu.
+     * @param position The position to show the menu at.
+     */
     void show(Frame* source, Point position = { kNotSet, kNotSet });
+    /**
+     * @brief Sets this menu as the native menu bar (macOS only).
+     */
     void setAsNativeMenuBar() { setNativeMenuBar(*this); }
-
+    /**
+     * @brief Adds an option to the menu.
+     * @param option_id The ID of the option.
+     * @param option_name The name of the option.
+     * @return A reference to the newly added PopupMenu item.
+     */
     PopupMenu& addOption(int option_id, const String& option_name) {
       options_.emplace_back(option_name, option_id);
       return options_.back();
     }
-
+    /**
+     * @brief Sets the selected state of the menu item.
+     * @param selected The new selected state.
+     * @return A reference to this PopupMenu.
+     */
     PopupMenu& select(bool selected) {
       selected_ = selected;
       return *this;
     }
 
     bool selected() const { return selected_; }
-
+    /**
+     * @brief Sets the enabled state of the menu item.
+     * @param enabled The new enabled state.
+     * @return A reference to this PopupMenu.
+     */
     PopupMenu& enable(bool enabled) {
       enabled_ = enabled;
       return *this;
     }
-
+    /**
+     * @brief Sets a native keyboard shortcut for the menu item.
+     * @param modifiers The modifier keys.
+     * @param character The character key.
+     * @return A reference to this PopupMenu.
+     */
     PopupMenu& withNativeKeyboardShortcut(int modifiers, std::string character) {
       shortcut_modifiers_ = modifiers;
       shortcut_character_ = character;
@@ -74,14 +111,27 @@ namespace visage {
     const std::string& nativeShortcutCharacter() const { return shortcut_character_; }
 
     bool enabled() const { return enabled_; }
-
+    /**
+     * @brief Returns the callback list for the selection event.
+     * @return A reference to the on_selection_ callback list.
+     */
     auto& onSelection() { return on_selection_; }
+    /**
+     * @brief Returns the callback list for the cancel event.
+     * @return A reference to the on_cancel_ callback list.
+     */
     auto& onCancel() { return on_cancel_; }
 
     const auto& onSelection() const { return on_selection_; }
     const auto& onCancel() const { return on_cancel_; }
-
+    /**
+     * @brief Adds a sub-menu to this menu.
+     * @param sub_menu The sub-menu to add.
+     */
     void addSubMenu(PopupMenu sub_menu) { options_.push_back(std::move(sub_menu)); }
+    /**
+     * @brief Adds a separator to the menu.
+     */
     void addBreak() { options_.push_back({ "", -1, {}, true }); }
 
     const std::vector<PopupMenu>& options() const { return options_; }
@@ -105,9 +155,16 @@ namespace visage {
     std::string shortcut_character_;
     std::vector<PopupMenu> options_;
   };
-
+  /**
+   * @class PopupList
+   * @brief A scrollable list of popup menu options.
+   */
   class PopupList : public ScrollableFrame {
   public:
+    /**
+     * @class Listener
+     * @brief An interface for responding to events from a PopupList.
+     */
     class Listener {
     public:
       virtual ~Listener() = default;
@@ -119,8 +176,15 @@ namespace visage {
     };
 
     PopupList() = default;
-
+    /**
+     * @brief Sets the options to be displayed in the list.
+     * @param options A vector of PopupMenu objects.
+     */
     void setOptions(std::vector<PopupMenu> options) { options_ = std::move(options); }
+    /**
+     * @brief Sets the font to be used for the text in the list.
+     * @param font The font to use.
+     */
     void setFont(const Font& font) { font_ = font.withDpiScale(dpiScale()); }
 
     float renderHeight() const;
@@ -155,9 +219,24 @@ namespace visage {
         listener->mouseMovedOnMenu(e.relativeTo(this).position, this);
       return result;
     }
+    /**
+     * @brief Adds a listener to this PopupList.
+     * @param listener The listener to add.
+     */
     void addListener(Listener* listener) { listeners_.push_back(listener); }
+    /**
+     * @brief Resets the currently open sub-menu.
+     */
     void resetOpenMenu() { menu_open_index_ = -1; }
+    /**
+     * @brief Sets the currently open sub-menu.
+     * @param index The index of the sub-menu to open.
+     */
     void setOpenMenu(int index) { menu_open_index_ = index; }
+    /**
+     * @brief Sets the opacity of the list.
+     * @param opacity The new opacity value.
+     */
     void setOpacity(float opacity) {
       opacity_ = opacity;
       redraw();

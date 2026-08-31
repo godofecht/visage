@@ -34,10 +34,20 @@
 #include <vector>
 
 namespace visage {
+  /**
+   * @class Window
+   * @brief Represents a native OS window and handles its events.
+   *
+   * This is an abstract base class that defines the interface for a window.
+   * Platform-specific implementations will inherit from this class.
+   */
   class Window {
   public:
     static constexpr float kDefaultDpi = 96.0f;
-
+    /**
+     * @enum Decoration
+     * @brief Defines the style of the window's frame and title bar.
+     */
     enum class Decoration {
       Native,
       Client,
@@ -46,7 +56,13 @@ namespace visage {
 
     static void setDoubleClickSpeed(int ms) { double_click_speed_ = ms; }
     static int doubleClickSpeed() { return double_click_speed_; }
-
+    /**
+     * @class EventHandler
+     * @brief An interface for handling events from a Window.
+     *
+     * A class that needs to receive window events should inherit from this
+     * class and implement its virtual methods.
+     */
     class EventHandler {
     public:
       virtual ~EventHandler() = default;
@@ -94,8 +110,14 @@ namespace visage {
     auto& onShow() { return on_show_; }
     auto& onHide() { return on_hide_; }
     auto& onWindowContentsResized() { return on_contents_resized_; }
-
+    /**
+     * @brief Enters the platform-specific event loop. This function will block until the window is closed.
+     */
     virtual void runEventLoop() = 0;
+    /**
+     * @brief Gets the native handle of the window.
+     * @return A void pointer to the native window handle (e.g., HWND on Windows, NSView* on macOS).
+     */
     virtual void* nativeHandle() const = 0;
     virtual void windowContentsResized(int width, int height) = 0;
     virtual bool closeRequested() { return true; }
@@ -104,12 +126,31 @@ namespace visage {
     virtual void* globalDisplay() const { return nullptr; }
     virtual void processPluginFdEvents() { }
     virtual int posixFd() const { return 0; }
-
+    /**
+     * @brief Shows the window.
+     */
     virtual void show() = 0;
+    /**
+     * @brief Shows the window in a maximized state.
+     */
     virtual void showMaximized() = 0;
+    /**
+     * @brief Hides the window.
+     */
     virtual void hide() = 0;
+    /**
+     * @brief Closes the window.
+     */
     virtual void close() = 0;
+    /**
+     * @brief Checks if the window is currently showing.
+     * @return True if the window is showing, false otherwise.
+     */
     virtual bool isShowing() const = 0;
+    /**
+     * @brief Sets the title of the window.
+     * @param title The new window title.
+     */
     virtual void setWindowTitle(const std::string& title) = 0;
     virtual void setFixedAspectRatio(bool fixed) { }
     virtual IPoint maxWindowDimensions() const = 0;
@@ -210,15 +251,51 @@ namespace visage {
 
     VISAGE_LEAK_CHECKER(Window)
   };
-
+  /**
+   * @brief Sets the global mouse cursor style.
+   * @param style The cursor style to set.
+   */
   void setCursorStyle(MouseCursor style);
+  /**
+   * @brief Sets the visibility of the global mouse cursor.
+   * @param visible True to show the cursor, false to hide it.
+   */
   void setCursorVisible(bool visible);
+  /**
+   * @brief Gets the current position of the mouse cursor.
+   * @return The cursor position in logical coordinates.
+   */
   Point cursorPosition();
+  /**
+   * @brief Sets the position of the mouse cursor relative to the window.
+   * @param window_position The new position in logical coordinates.
+   */
   void setCursorPosition(Point window_position);
+  /**
+   * @brief Sets the position of the mouse cursor in screen coordinates.
+   * @param screen_position The new position in screen coordinates.
+   */
   void setCursorScreenPosition(Point screen_position);
+  /**
+   * @brief Checks if the application is running on a mobile device.
+   * @return True if on a mobile device, false otherwise.
+   */
   bool isMobileDevice();
+  /**
+   * @brief Displays a native message box.
+   * @param title The title of the message box.
+   * @param message The message to display.
+   */
   void showMessageBox(std::string title, std::string message);
+  /**
+   * @brief Reads text from the system clipboard.
+   * @return The text from the clipboard.
+   */
   std::string readClipboardText();
+  /**
+   * @brief Writes text to the system clipboard.
+   * @param text The text to write to the clipboard.
+   */
   void setClipboardText(const std::string& text);
 
   int doubleClickSpeed();
@@ -227,10 +304,25 @@ namespace visage {
   float defaultDpiScale();
   IBounds computeWindowBounds(const Dimension& x, const Dimension& y, const Dimension& width,
                               const Dimension& height);
-
+  /**
+   * @brief Creates a new platform-specific window.
+   * @param x The initial x-coordinate of the window.
+   * @param y The initial y-coordinate of the window.
+   * @param width The initial width of the window.
+   * @param height The initial height of the window.
+   * @param decoration_style The decoration style of the window.
+   * @return A unique_ptr to the newly created Window object.
+   */
   std::unique_ptr<Window> createWindow(const Dimension& x, const Dimension& y,
                                        const Dimension& width, const Dimension& height,
                                        Window::Decoration decoration_style = Window::Decoration::Native);
+  /**
+   * @brief Creates a new platform-specific window for use as a plugin.
+   * @param width The initial width of the window.
+   * @param height The initial height of the window.
+   * @param parent_handle A native handle to the parent window.
+   * @return A unique_ptr to the newly created Window object.
+   */
   std::unique_ptr<Window> createPluginWindow(const Dimension& width, const Dimension& height,
                                              void* parent_handle);
 
@@ -242,6 +334,8 @@ namespace visage {
   inline IBounds computeWindowBounds(const Dimension& width, const Dimension& height) {
     return computeWindowBounds({}, {}, width, height);
   }
-
+  /**
+   * @brief Closes the application.
+   */
   void closeApplication();
 }

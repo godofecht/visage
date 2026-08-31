@@ -24,6 +24,14 @@
 #include <memory>
 
 namespace visage {
+  /**
+   * @class clone_ptr
+   * @brief A smart pointer that owns and manages another object through a pointer
+   *        and disposes of that object when the clone_ptr goes out of scope.
+   *        It behaves like std::unique_ptr but provides a copy constructor that
+   *        creates a deep copy of the managed object.
+   * @tparam T The type of the managed object.
+   */
   template<class T>
   class clone_ptr {
   public:
@@ -42,12 +50,34 @@ namespace visage {
 
     clone_ptr(clone_ptr&&) noexcept = default;
     clone_ptr& operator=(clone_ptr&&) noexcept = default;
-
+    /**
+     * @brief Resets the clone_ptr, deleting the managed object.
+     */
     void reset() { p_.reset(); }
+    /**
+     * @brief Resets the clone_ptr to manage a new object.
+     * @param p A unique_ptr to the new object.
+     */
     void reset(std::unique_ptr<T> p) { p_ = std::move(p); }
+    /**
+     * @brief Swaps the managed object with another clone_ptr.
+     * @param other The other clone_ptr to swap with.
+     */
     void swap(clone_ptr& other) noexcept { p_.swap(other.p_); }
+    /**
+     * @brief Gets a pointer to the managed object.
+     * @return A pointer to the managed object, or nullptr if the clone_ptr is empty.
+     */
     T* get() const { return p_.get(); }
+    /**
+     * @brief Dereferences the pointer to the managed object.
+     * @return A reference to the managed object.
+     */
     T& operator*() const { return p_.operator*(); }
+    /**
+     * @brief Dereferences the pointer to the managed object.
+     * @return A pointer to the managed object.
+     */
     T* operator->() const { return p_.operator->(); }
     explicit operator bool() const { return static_cast<bool>(p_); }
 

@@ -24,9 +24,25 @@
 #include <string>
 
 namespace visage {
+  /**
+   * @brief The default timeout in milliseconds for a child process to complete.
+   */
   static constexpr int kDefaultChildProcessTimeoutMs = 10000;
+  /**
+   * @brief The maximum size of the output that will be read from the child process.
+   */
   static constexpr size_t kMaxOutputSize = 1024 * 1024;
-
+  /**
+   * @brief Spawns a child process and waits for it to complete.
+   *
+   * This function executes a command in a new process and captures its standard output.
+   *
+   * @param command The command to execute.
+   * @param arguments The arguments to pass to the command.
+   * @param[out] output A string to store the standard output of the process.
+   * @param timeout_ms The maximum time in milliseconds to wait for the process to complete.
+   * @return True if the process was spawned and completed successfully within the timeout, false otherwise.
+   */
   bool spawnChildProcess(const std::string& command, const std::string& arguments,
                          std::string& output, int timeout_ms = kDefaultChildProcessTimeoutMs);
 }

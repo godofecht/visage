@@ -47,16 +47,35 @@ namespace visage {
   void forceCrash();
 }
 
+/**
+ * @def VISAGE_FORCE_CRASH()
+ * @brief Forces the application to crash immediately. Useful for debugging critical errors.
+ */
 #define VISAGE_FORCE_CRASH() visage::forceCrash()
 
 #ifndef NDEBUG
-
+/**
+ * @def VISAGE_LOG(log, ...)
+ * @brief Logs a debug message, including the file and line number.
+ * @param log The message or format string to log.
+ * @param ... Optional arguments for the format string.
+ */
 #define VISAGE_LOG(log, ...) visage::debugLog(__FILE__, int(__LINE__), log, ##__VA_ARGS__)
-
+/**
+ * @def VISAGE_ASSERT(condition)
+ * @brief Asserts that a condition is true. If the condition is false, the application will terminate.
+ * @param condition The condition to check.
+ */
 #define VISAGE_ASSERT(condition) visage::debugAssert((condition), __FILE__, int(__LINE__))
 #define no_except
 
 namespace visage {
+  /**
+   * @class InstanceCounter
+   * @brief A template class to count the number of instances of a given type.
+   *        This is primarily used for leak checking in debug builds.
+   * @tparam T The type to count instances of.
+   */
   template<typename T>
   class InstanceCounter {
   public:
@@ -73,7 +92,12 @@ namespace visage {
   private:
     int count_ = 0;
   };
-
+  /**
+   * @class LeakChecker
+   * @brief A helper class that uses InstanceCounter to detect memory leaks.
+   *        An instance of this class is added to another class to track its lifetime.
+   * @tparam T The type to check for leaks.
+   */
   template<typename T>
   class LeakChecker {
   public:
@@ -84,7 +108,12 @@ namespace visage {
     ~LeakChecker() { InstanceCounter<T>::instance().remove(); }
   };
 }
-
+/**
+ * @def VISAGE_LEAK_CHECKER(className)
+ * @brief A macro to add a LeakChecker to a class.
+ *        This should be placed inside the class definition.
+ * @param className The name of the class to check for leaks.
+ */
 #define VISAGE_LEAK_CHECKER(className)             \
   friend class visage::InstanceCounter<className>; \
   static const char* vaLeakCheckerName() {         \
@@ -100,6 +129,10 @@ namespace visage {
 #endif
 
 #if VISAGE_WINDOWS
+/**
+ * @def VISAGE_STDCALL
+ * @brief Defines the __stdcall calling convention for Windows platforms.
+ */
 #define VISAGE_STDCALL __stdcall
 #else
 #define VISAGE_STDCALL

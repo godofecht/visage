@@ -26,25 +26,42 @@
 
 namespace visage::time {
   typedef std::chrono::time_point<std::chrono::system_clock> Time;
-
+  /**
+   * @brief Gets the current time in milliseconds since the epoch.
+   * @return The number of milliseconds.
+   */
   inline long long milliseconds() {
     auto now = std::chrono::system_clock::now().time_since_epoch();
     return std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
   }
-
+  /**
+   * @brief Gets the current time in microseconds since the epoch.
+   * @return The number of microseconds.
+   */
   inline long long microseconds() {
     auto now = std::chrono::system_clock::now().time_since_epoch();
     return std::chrono::duration_cast<std::chrono::microseconds>(now).count();
   }
-
+  /**
+   * @brief Gets the current time in seconds since the epoch.
+   * @return The number of seconds.
+   */
   inline int seconds() {
     auto now = std::chrono::system_clock::now().time_since_epoch();
     return std::chrono::duration_cast<std::chrono::seconds>(now).count();
   }
-
+  /**
+   * @brief Gets the current time as a std::chrono::time_point.
+   * @return A time_point representing the current time.
+   */
   inline Time now() {
     return std::chrono::system_clock::now();
   }
-
+  /**
+   * @brief Formats a time_point into a string.
+   * @param time The time_point to format.
+   * @param format_string A format string compatible with std::strftime.
+   * @return The formatted time string.
+   */
   std::string formatTime(const Time& time, const char* format_string);
 }

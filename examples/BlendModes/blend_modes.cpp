@@ -23,38 +23,56 @@
 
 #include <visage/app.h>
 
+// This helper function draws three overlapping circles in red, green, and blue,
+// resembling a Venn diagram. It's used to demonstrate how different blend modes
+// affect overlapping colors.
 static void drawRgbCircles(visage::Canvas& canvas, float width, float height) {
+  // Define constants for circle layout.
   static constexpr float kCircleRadiusRatio = 0.2f;
   static constexpr float kVennRadiusRatio = 0.13f;
-  static constexpr float k60DegreeTriangleRatio = 0.866025403784f;
+  static constexpr float k60DegreeTriangleRatio = 0.866025403784f; // sin(60 degrees)
 
+  // Base dimensions on the smaller of width or height to maintain aspect ratio.
   float min_dimension = std::min(width, height);
 
+  // Calculate pixel dimensions from ratios.
   float circle_radius = kCircleRadiusRatio * min_dimension;
   float venn_radius = kVennRadiusRatio * min_dimension;
   float venn_offset = k60DegreeTriangleRatio * venn_radius;
   float start_x = width / 2.0f - circle_radius;
   float start_y = height / 2.0f - circle_radius;
 
-  canvas.setColor(0xffff0000);
+  // Draw the three circles with their respective colors.
+  canvas.setColor(0xffff0000); // Red
   canvas.circle(start_x, start_y + venn_radius, 2 * circle_radius);
-  canvas.setColor(0xff00ff00);
+  canvas.setColor(0xff00ff00); // Green
   canvas.circle(start_x - venn_offset, start_y - venn_radius * 0.5f, 2 * circle_radius);
-  canvas.setColor(0xff0000ff);
+  canvas.setColor(0xff0000ff); // Blue
   canvas.circle(start_x + venn_offset, start_y - venn_radius * 0.5f, 2 * circle_radius);
 }
 
+// The main application window class for this example.
+// It is divided into four quadrants, each demonstrating a different blending concept.
 class ExampleEditor : public visage::ApplicationWindow {
 public:
   ExampleEditor() {
+    // Add four child frames to the window, one for each quadrant.
     addChild(&additive_frame_);
     addChild(&subtractive_frame_);
+
+    // The masked frame demonstrates using blend modes to create a mask.
     masked_frame_.setMasked(true);
     addChild(&masked_frame_);
+
+    // This frame demonstrates grouped transparency. The entire frame and its children
+    // will be rendered with an alpha of 0.5.
     transparent_frame_.setAlphaTransparency(0.5f);
     addChild(&transparent_frame_);
 
+    // --- Top-Left Quadrant: Additive Blending ---
     additive_frame_.onDraw() = [this](visage::Canvas& canvas) {
+      // Set the blend mode to Add. In this mode, color values are added together.
+      // For RGB colors, this simulates mixing light (e.g., red + green = yellow).
       canvas.setBlendMode(visage::BlendMode::Add);
       canvas.setColor(0xffffffff);
       canvas.text("Additive", font_, visage::Font::kCenter, 0, 0, additive_frame_.width(),
@@ -62,10 +80,14 @@ public:
       drawRgbCircles(canvas, additive_frame_.width(), additive_frame_.height());
     };
 
+    // --- Top-Right Quadrant: Subtractive Blending ---
     subtractive_frame_.onDraw() = [this](visage::Canvas& canvas) {
+      // Start with a light gray background.
       canvas.setColor(0xffeeeeee);
       canvas.fill(0, 0, subtractive_frame_.width(), subtractive_frame_.height());
 
+      // Set the blend mode to Sub. Color values are subtracted.
+      // This simulates mixing pigments (e.g., white - red = cyan).
       canvas.setBlendMode(visage::BlendMode::Sub);
       canvas.setColor(0xffffffff);
       canvas.text("Subtractive", font_, visage::Font::kCenter, 0, 0, subtractive_frame_.width(),
@@ -73,7 +95,9 @@ public:
       drawRgbCircles(canvas, subtractive_frame_.width(), subtractive_frame_.height());
     };
 
+    // --- Bottom-Left Quadrant: Masking ---
     masked_frame_.onDraw() = [this](visage::Canvas& canvas) {
+      // First, draw a background to be masked. Here it's magenta and white stripes.
       static constexpr int kColumns = 12;
       int w = masked_frame_.width();
       int h = masked_frame_.height();
@@ -88,20 +112,28 @@ public:
         last_x = x;
       }
 
+      // To create a mask, we first clear the mask channel.
       canvas.setBlendMode(visage::BlendMode::MaskRemove);
       canvas.setColor(0xffffffff);
       canvas.fill(0, 0, w, h);
 
+      // Then, we draw the shape of our mask.
       canvas.setBlendMode(visage::BlendMode::MaskAdd);
       canvas.setColor(0xffffffff);
       drawRgbCircles(canvas, w, h);
 
+      // Finally, we set the blend mode back to Alpha to draw content on top,
+      // which will now be clipped by the mask we created.
       canvas.setBlendMode(visage::BlendMode::Alpha);
       canvas.setColor(0xffffffff);
       canvas.text("Masked", font_, visage::Font::kCenter, 0, 0, w, 0.2f * masked_frame_.height());
     };
 
+    // --- Bottom-Right Quadrant: Grouped Transparency ---
     transparent_frame_.onDraw() = [this](visage::Canvas& canvas) {
+      // All drawing within this frame will be affected by the `setAlphaTransparency(0.5f)`
+      // call made in the constructor. The entire frame is rendered to a separate texture
+      // and then blended with the main window with 50% opacity.
       canvas.setColor(0xffffffff);
       canvas.text("Grouped Transparency", font_, visage::Font::kCenter, 0, 0,
                   transparent_frame_.width(), 0.2f * transparent_frame_.height());
@@ -109,12 +141,14 @@ public:
     };
   }
 
+  // The main draw call for the window.
   void draw(visage::Canvas& canvas) override {
-    static constexpr int kColumns = 12;
-
+    // Set a dark background for the entire window.
     canvas.setColor(0xff222026);
     canvas.fill(0, 0, width(), height());
 
+    // Draw a checkered background behind the transparent frame to make its effect visible.
+    static constexpr int kColumns = 12;
     int w = transparent_frame_.width();
     int h = transparent_frame_.height();
     int last_x = transparent_frame_.x();
@@ -130,7 +164,9 @@ public:
     }
   }
 
+  // This is called when the window is resized.
   void resized() override {
+    // Recalculate the bounds of the four quadrants.
     int center_x = width() / 2;
     int center_y = height() / 2;
 
@@ -139,6 +175,7 @@ public:
     masked_frame_.setBounds(0, center_y, center_x, height() - center_y);
     transparent_frame_.setBounds(center_x, center_y, width() - center_x, height() - center_y);
 
+    // Re-create the font with the appropriate DPI scaling.
     font_ = visage::Font(16, resources::fonts::Lato_Regular_ttf);
   }
 

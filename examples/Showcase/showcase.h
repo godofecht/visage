@@ -31,8 +31,14 @@
 #include <visage_widgets/palette_editor.h>
 #include <visage_widgets/shader_editor.h>
 
+// This example is a comprehensive showcase of many of Visage's features,
+// including custom theming, various widgets, post-processing effects,
+// and palette editing.
+
 class DebugInfo;
 
+// The Overlay class is a semi-transparent layer that can appear over the main content.
+// It uses a post-processing shader to create a zoom/blur effect on the content behind it.
 class Overlay : public visage::Frame {
 public:
   Overlay();
@@ -43,7 +49,7 @@ public:
   float bodyRounding();
 
   void mouseDown(const visage::MouseEvent& e) override {
-    animation_.target(false);
+    animation_.target(false); // Animate the overlay out on click.
     redraw();
   }
   void visibilityChanged() override { animation_.target(isVisible()); }
@@ -54,6 +60,7 @@ private:
   visage::CallbackList<void(float)> on_animate_;
 };
 
+// A separate window for editing the color values in the application's palette.
 class PaletteColorWindow : public visage::ApplicationWindow {
 public:
   explicit PaletteColorWindow(visage::Palette* palette) : editor_(palette) {
@@ -65,6 +72,7 @@ private:
   visage::PaletteColorEditor editor_;
 };
 
+// A separate window for editing the numerical values (e.g., sizes, intensities) in the palette.
 class PaletteValueWindow : public visage::ApplicationWindow {
 public:
   explicit PaletteValueWindow(visage::Palette* palette) : editor_(palette) {
@@ -76,6 +84,8 @@ private:
   visage::PaletteValueEditor editor_;
 };
 
+// The main class for the showcase. It's a Frame that contains all the example
+// widgets and also implements the UndoHistory for undo/redo functionality.
 class Showcase : public visage::Frame,
                  public visage::UndoHistory {
 public:
