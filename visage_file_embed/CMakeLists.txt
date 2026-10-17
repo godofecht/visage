@@ -35,7 +35,8 @@ function(add_embedded_resources project include_filename namespace files)
     foreach(file IN LISTS files)
       # CMake 4.5 source-specific patterns preserve the original numeric index.
       set_property(SOURCE "${file}" PROPERTY "${_embed_rule}_PATTERNS" "INDEX=${index}")
-      if(IS_ABSOLUTE "${file}" AND "${file}" MATCHES "^${CMAKE_CURRENT_BINARY_DIR}/")
+      cmake_path(IS_PREFIX CMAKE_CURRENT_BINARY_DIR "${file}" NORMALIZE _visage_is_binary_input)
+      if(_visage_is_binary_input)
         list(APPEND _embed_binary_inputs "${file}")
       else()
         list(APPEND _embed_source_inputs "${file}")
@@ -43,7 +44,22 @@ function(add_embedded_resources project include_filename namespace files)
       math(EXPR index "${index} + 1")
     endforeach()
   else()
-${orig}  endif()
+  set(index 1)
+  foreach (file IN LISTS files)
+    set(embedded_file_name "embedded_files${index}.cpp")
+    set(source_file "${destination_path}/${embedded_file_name}")
+    list(APPEND source_files ${source_file})
+    get_filename_component(original_file_name ${file} NAME)
+    add_custom_command(
+      OUTPUT ${source_file}
+      COMMAND ${CMAKE_COMMAND} -DDEST_FILE=${source_file} -DORIGINAL_FILE=${file} -DVAR_NAMESPACE=${namespace} -P ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/embed_file.cmake
+      DEPENDS ${file}
+      COMMENT "Generating ${embedded_file_name} for ${original_file_name}"
+    )
+    set_source_files_properties(${source_file} PROPERTIES GENERATED TRUE)
+    math(EXPR index "${index} + 1")
+  endforeach ()
+  endif()
 
   string(REPLACE ";" "\\;" escaped_files "${files}")
   add_custom_command(
