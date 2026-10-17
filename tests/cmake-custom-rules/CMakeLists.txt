@@ -8,7 +8,7 @@ option(VISAGE_USE_CUSTOM_RULES "Use CMake 4.5 embedding rule templates" OFF)
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../../visage_file_embed"
                  "${CMAKE_CURRENT_BINARY_DIR}/visage_file_embed")
 add_embedded_resources(EmbedFixture "fixture.h" "visage_smoke"
-    "${CMAKE_CURRENT_SOURCE_DIR}/sample.txt")
+    "${CMAKE_CURRENT_SOURCE_DIR}/sample.txt;${CMAKE_CURRENT_SOURCE_DIR}/second.txt")
 
 add_executable(embed_smoke main.cpp)
 target_link_libraries(embed_smoke PRIVATE EmbedFixture)
