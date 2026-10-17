@@ -2,8 +2,8 @@
 
 int main()
 {
-    return (visage_smoke::sample_txt.size == 6 &&
+    return (visage_smoke::sample_txt.size == 7 &&
             visage_smoke::sample_txt.data != nullptr &&
             visage_smoke::sample_txt.data[0] == 'V' &&
-            visage_smoke::sample_txt.data[5] == '\\n') ? 0 : 1;
+            visage_smoke::sample_txt.data[6] == '\\n') ? 0 : 1;
 }
