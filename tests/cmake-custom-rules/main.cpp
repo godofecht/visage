@@ -3,6 +3,8 @@
 int main()
 {
     return (visage_smoke::sample_txt.size == 7 &&
+            visage_smoke::second_txt.size == 7 &&
+            visage_smoke::second_txt.data[0] == 's' &&
             visage_smoke::sample_txt.data != nullptr &&
             visage_smoke::sample_txt.data[0] == 'V' &&
             visage_smoke::sample_txt.data[6] == '\n') ? 0 : 1;
