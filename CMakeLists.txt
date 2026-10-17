@@ -13,6 +13,7 @@ if (APPLE)
 endif ()
 
 option(VISAGE_AMALGAMATED_BUILD "Compile sources together" ON)
+option(VISAGE_USE_CUSTOM_RULES "Opt in to CMake 4.5 per-source shader and resource rules" OFF)
 option(VISAGE_ENABLE_WIDGETS "Add widgets library" ON)
 option(VISAGE_ENABLE_BACKGROUND_GRAPHICS_THREAD "Offloads graphics rendering to a background thread" OFF)
 option(VISAGE_ENABLE_GRAPHICS_DEBUG_LOGGING "Shows graphics debug log in console in debug mode" OFF)
