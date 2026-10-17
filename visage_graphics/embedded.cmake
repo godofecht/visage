@@ -9,12 +9,12 @@ function(visage_embed_shaders project include_filename namespace original_shader
   set(SPIRV_FOLDER ${CMAKE_CURRENT_BINARY_DIR}/shaders/spirv)
   set(ESSL_FOLDER ${CMAKE_CURRENT_BINARY_DIR}/shaders/essl)
 
-  if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-    set(SHADERC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/bin/win32/shaderc.exe")
-  elseif (CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
-    set(SHADERC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/bin/macos/shaderc")
-  elseif (CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
-    set(SHADERC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/bin/linux/shaderc")
+  if(DEFINED VISAGE_SHADERC_EXECUTABLE AND NOT "${VISAGE_SHADERC_EXECUTABLE}" STREQUAL "")
+    set(SHADERC "${VISAGE_SHADERC_EXECUTABLE}")
+  else()
+${old.split("
+").map(x=>x.length?"  "+x:x).join("
+")}
   endif()
 
   file(MAKE_DIRECTORY ${SHADER_FOLDER})
