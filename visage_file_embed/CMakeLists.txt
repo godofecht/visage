@@ -79,12 +79,12 @@ function(add_embedded_resources project include_filename namespace files)
     # Keep source and generated input base directories in separate sets.
     # This also works when the binary tree is nested inside the source tree.
     if(_embed_source_inputs)
-      target_sources(${project} PRIVATE FILE_SET ${project}_asset_sources
+      target_sources(${project} PRIVATE FILE_SET visage_${project}_asset_sources
         TYPE ${_embed_rule} BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
         FILES ${_embed_source_inputs})
     endif()
     if(_embed_binary_inputs)
-      target_sources(${project} PRIVATE FILE_SET ${project}_asset_binaries
+      target_sources(${project} PRIVATE FILE_SET visage_${project}_asset_binaries
         TYPE ${_embed_rule} BASE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
         FILES ${_embed_binary_inputs})
     endif()
