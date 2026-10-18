@@ -1,0 +1,36 @@
+name: Emscripten build smoke
+
+on:
+  pull_request:
+    paths:
+      - 'CMakeLists.txt'
+      - 'visage_graphics/**'
+      - 'visage_file_embed/**'
+      - 'cmake/**'
+      - 'examples/**'
+      - '.github/workflows/emscripten-build-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git /tmp/emsdk
+          /tmp/emsdk/emsdk install latest
+          /tmp/emsdk/emsdk activate latest
+      - name: Configure and build WebAssembly
+        shell: bash
+        run: |
+          source /tmp/emsdk/emsdk_env.sh
+          emcmake cmake -S . -B cmake_build -DCMAKE_BUILD_TYPE=Release
+          cmake --build cmake_build --parallel 4
+      - name: Verify example artifacts
+        run: |
+          test -d cmake_build/examples/builds
+          find cmake_build/examples/builds -type f | head -30
