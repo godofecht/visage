@@ -1,4 +1,4 @@
-name: Emscripten Deploy
+name: Emscripten build and optional deploy
 on:
   push:
     branches:
@@ -6,6 +6,13 @@ on:
 jobs:
   Deploy-Emscripten:
     runs-on: ubuntu-latest
+    env:
+      R2_KEY_ID: ${{ secrets.R2_KEY_ID }}
+      R2_SECRET: ${{ secrets.R2_SECRET }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      VISAGE_ZONE_ID: ${{ secrets.VISAGE_ZONE_ID }}
+      CLOUDFLARE_USER: ${{ secrets.CLOUDFLARE_USER }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -37,16 +44,33 @@ jobs:
           name: EmscriptenBuilds
           path: cmake_package/
 
-      - name: Install AWS CLI v2.22.35 # Install this version because of R2 checksum issue
+      - name: Explain why deployment was not attempted
+        if: env.R2_KEY_ID == '' || env.R2_SECRET == '' || env.R2_ENDPOINT == ''
         run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.22.35.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
+          echo "::warning::WebAssembly package built and uploaded as an artifact, but R2 deployment was not attempted: required repository secrets are unset."
+          echo "### Emscripten build succeeded; external deployment pending R2 credentials" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install AWS CLI v2.22.35
+        if: env.R2_KEY_ID != '' && env.R2_SECRET != '' && env.R2_ENDPOINT != ''
+        run: |
+          curl --fail --location --silent --show-error "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.22.35.zip" -o "awscliv2.zip"
+          unzip -q awscliv2.zip
           sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update
 
-      - name: Upload to S3
+      - name: Upload build to R2
+        if: env.R2_KEY_ID != '' && env.R2_SECRET != '' && env.R2_ENDPOINT != ''
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET }}
+          AWS_DEFAULT_REGION: auto
+        run: aws --endpoint-url "$R2_ENDPOINT" s3 cp cmake_package/ s3://visage/examples/ --recursive
+
+      - name: Purge Cloudflare cache if configured
+        if: env.R2_KEY_ID != '' && env.R2_SECRET != '' && env.R2_ENDPOINT != '' && env.VISAGE_ZONE_ID != '' && env.CLOUDFLARE_USER != '' && env.CLOUDFLARE_API_KEY != ''
         run: |
-          export AWS_ACCESS_KEY_ID=${{ secrets.R2_KEY_ID }}
-          export AWS_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET }}
-          export AWS_DEFAULT_REGION=auto
-          aws --endpoint-url ${{ secrets.R2_ENDPOINT }} s3 cp cmake_package/ s3://visage/examples/ --recursive
-          curl https://api.cloudflare.com/client/v4/zones/${{ secrets.VISAGE_ZONE_ID }}/purge_cache -H 'Content-Type: application/json' -H "X-Auth-Email: ${{ secrets.CLOUDFLARE_USER }}" -H "X-Auth-Key: ${{ secrets.CLOUDFLARE_API_KEY }}" --data '{"purge_everything":true}'
+          curl --fail --silent --show-error --request POST \
+            "https://api.cloudflare.com/client/v4/zones/$VISAGE_ZONE_ID/purge_cache" \
+            -H 'Content-Type: application/json' \
+            -H "X-Auth-Email: $CLOUDFLARE_USER" \
+            -H "X-Auth-Key: $CLOUDFLARE_API_KEY" \
+            --data '{"purge_everything":true}'
