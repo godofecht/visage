@@ -28,12 +28,6 @@ namespace visage {
     removeFromWindow();
   }
 
-  void ApplicationWindow::registerCallbacks() {
-    window_->onShow() = [this] { on_show_.callback(); };
-    window_->onHide() = [this] { on_hide_.callback(); };
-    window_->onWindowContentsResized() = [this] { on_window_contents_resized_.callback(); };
-  }
-
   void ApplicationWindow::setWindowDimensions(const Dimension& width, const Dimension& height) {
     if (window_ == nullptr)
       setDpiScale(defaultDpiScale());
@@ -78,7 +72,6 @@ namespace visage {
   void ApplicationWindow::show(const Dimension& width, const Dimension& height, void* parent_window) {
     removeFromWindow();
     window_ = createPluginWindow(width, height, parent_window);
-    registerCallbacks();
     showWindow(false);
   }
 
@@ -90,7 +83,6 @@ namespace visage {
                                const Dimension& height) {
     removeFromWindow();
     window_ = createWindow(x, y, width, height, decoration_);
-    registerCallbacks();
     showWindow(false);
   }
 
@@ -100,17 +92,16 @@ namespace visage {
     removeFromWindow();
     window_ = createWindow({}, {}, Dimension::widthPercent(kUnmaximizedWidthPercent),
                            Dimension::heightPercent(kUnmaximizedWidthPercent), decoration_);
-    registerCallbacks();
     showWindow(true);
   }
 
   void ApplicationWindow::hide() {
-    if (window_)
+    if (window_ && onCloseRequested().callback())
       return window_->hide();
   }
 
   void ApplicationWindow::close() {
-    if (window_) {
+    if (window_ && onCloseRequested().callback()) {
       removeFromWindow();
       window_ = nullptr;
     }
@@ -127,7 +118,8 @@ namespace visage {
   void ApplicationWindow::showWindow(bool maximized) {
     if (!title_.empty())
       window_->setWindowTitle(title_);
-    window_->setAlwaysOnTop(always_on_top_);
+    if (always_on_top_)
+      window_->setAlwaysOnTop(true);
 
     addToWindow(window_.get());
     if (maximized)

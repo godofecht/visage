@@ -34,6 +34,7 @@
 
 namespace visage {
   class Frame;
+
   /**
    * @struct FrameEventHandler
    * @brief A collection of callbacks for handling events within a Frame.
@@ -51,6 +52,7 @@ namespace visage {
     std::function<std::string()> read_clipboard_text = nullptr;
     std::function<void(std::string)> set_clipboard_text = nullptr;
   };
+
   /**
    * @class Frame
    * @brief The base class for all UI components in Visage.
@@ -80,6 +82,7 @@ namespace visage {
 
       removeAllChildren();
     }
+
     /**
      * @brief Returns the callback list for the draw event.
      *
@@ -187,6 +190,7 @@ namespace visage {
      * @return A reference to the on_text_input_ callback list.
      */
     auto& onTextInput() { return on_text_input_; }
+
     /**
      * @brief Initializes the frame and its children.
      */
@@ -200,6 +204,7 @@ namespace visage {
      * @brief Destroys the frame and its children.
      */
     virtual void destroy() { destroyChildren(); }
+
     /**
      * @brief Called when the frame is resized.
      */
@@ -222,6 +227,7 @@ namespace visage {
      * @param was_clicked True if the focus change was due to a mouse click.
      */
     virtual void focusChanged(bool is_focused, bool was_clicked) { }
+
     /**
      * @brief Called when the mouse enters the frame.
      * @param e The mouse event.
@@ -270,6 +276,7 @@ namespace visage {
      * @return True if the event was handled, false otherwise.
      */
     virtual bool keyRelease(const KeyEvent& e) { return false; }
+
     /**
      * @brief Checks if the frame receives text input.
      * @return True if the frame receives text input, false otherwise.
@@ -280,12 +287,14 @@ namespace visage {
      * @param text The text that was input.
      */
     virtual void textInput(const std::string& text) { }
+
     /**
      * @brief Performs a hit test at the given position.
      * @param position The position to test.
      * @return The hit test result.
      */
     virtual HitTestResult hitTest(const Point& position) const { return HitTestResult::Client; }
+
     /**
      * @brief Checks if the frame receives dropped files.
      * @return True if the frame receives dropped files, false otherwise.
@@ -329,6 +338,7 @@ namespace visage {
      * @brief Called to clean up after a drag and drop operation.
      */
     virtual void cleanupDragDropSource() { }
+
     /**
      * @brief Sets the palette for the frame and its children.
      * @param palette A pointer to the Palette to use.
@@ -344,6 +354,7 @@ namespace visage {
      * @return A pointer to the Palette.
      */
     Palette* palette() const { return palette_; }
+
     /**
      * @brief Sets a palette override for the frame.
      * @param override_id The ID of the theme override.
@@ -361,6 +372,7 @@ namespace visage {
      * @return The theme override ID.
      */
     theme::OverrideId paletteOverride() const { return palette_override_; }
+
     /**
      * @brief Checks if the frame has been initialized.
      * @return True if the frame is initialized, false otherwise.
@@ -373,6 +385,7 @@ namespace visage {
       if (isVisible() && isDrawing() && !redrawing_)
         redrawing_ = requestRedraw();
     }
+
     /**
      * @brief Redraws the frame and all of its children.
      */
@@ -381,11 +394,13 @@ namespace visage {
       for (Frame* child : children_)
         child->redrawAll();
     }
+
     /**
      * @brief Gets the drawing region of the frame.
      * @return A pointer to the Region.
      */
     Region* region() { return &region_; }
+
     /**
      * @brief Sets a post-processing effect for the frame.
      * @param post_effect A pointer to the PostEffect.
@@ -400,6 +415,7 @@ namespace visage {
      * @brief Removes the post-processing effect from the frame.
      */
     void removePostEffect();
+
     /**
      * @brief Sets a backdrop effect for the frame.
      * @param backdrop_effect A pointer to the PostEffect to use as a backdrop.
@@ -414,6 +430,7 @@ namespace visage {
      * @brief Removes the backdrop effect from the frame.
      */
     void removeBackdropEffect();
+
     /**
      * @brief Sets the blur radius for the frame.
      *
@@ -439,6 +456,7 @@ namespace visage {
       blur_effect_->setBlurRadius(blur_radius);
       redraw();
     }
+
     /**
      * @brief Sets the alpha transparency of the frame.
      * @param alpha The alpha value, from 0.0 (fully transparent) to 1.0 (fully opaque).
@@ -450,10 +468,12 @@ namespace visage {
       alpha_transparency_ = alpha;
       redraw();
     }
+
     /**
      * @brief Removes the alpha transparency from the frame.
      */
     void removeAlphaTransparency() { setAlphaTransparency(1.0f); }
+
     /**
      * @brief Sets whether the frame's contents should be cached.
      * @param cached True to cache the frame, false otherwise.
@@ -462,6 +482,7 @@ namespace visage {
       cached_ = cached;
       redraw();
     }
+
     /**
      * @brief Sets whether the frame should be masked.
      * @param masked True to mask the frame, false otherwise.
@@ -470,6 +491,7 @@ namespace visage {
       masked_ = masked;
       redraw();
     }
+
     /**
      * @brief Gets the name of the frame.
      * @return A const reference to the frame's name.
@@ -480,6 +502,7 @@ namespace visage {
      * @param name The new name for the frame.
      */
     void setName(std::string name) { name_ = std::move(name); }
+
     /**
      * @brief Sets the visibility of the frame.
      * @param visible True to make the frame visible, false to hide it.
@@ -510,6 +533,7 @@ namespace visage {
      * @return True if the frame is on top, false otherwise.
      */
     bool isOnTop() const { return on_top_; }
+
     /**
      * @brief Adds a child frame to this frame.
      * @param child A pointer to the child frame to add.
@@ -533,6 +557,7 @@ namespace visage {
      * @param child A pointer to the child frame to remove.
      */
     void removeChild(Frame* child);
+    void removeChild(Frame& child) { removeChild(&child); }
     /**
      * @brief Removes all child frames from this frame.
      */
@@ -564,12 +589,14 @@ namespace visage {
      * @return A const reference to the vector of child frames.
      */
     const std::vector<Frame*>& children() const { return children_; }
+
     /**
      * @brief Sets the event handler for this frame and its children.
      * @param handler A pointer to the FrameEventHandler.
      */
     void setEventHandler(FrameEventHandler* handler) {
       event_handler_ = handler;
+      redrawing_ = false;
       for (Frame* child : children_)
         child->setEventHandler(handler);
     }
@@ -578,6 +605,7 @@ namespace visage {
      * @return A pointer to the FrameEventHandler.
      */
     FrameEventHandler* eventHandler() const { return event_handler_; }
+
     /**
      * @brief Finds the first parent of this frame that is of a given type.
      * @tparam T The type of the parent to find.
@@ -596,6 +624,7 @@ namespace visage {
 
       return nullptr;
     }
+
     /**
      * @brief Checks if the frame contains a given point.
      * @param point The point to check.
@@ -613,6 +642,7 @@ namespace visage {
      * @return A pointer to the top-level parent frame.
      */
     Frame* topParentFrame();
+
     /**
      * @brief Sets the bounds of this frame.
      * @param bounds The new bounds for the frame.
@@ -674,6 +704,7 @@ namespace visage {
      * @return The top-left position.
      */
     Point topLeft() const { return { bounds_.x(), bounds_.y() }; }
+
     /**
      * @brief Checks if this frame has a layout.
      * @return True if the frame has a layout, false otherwise.
@@ -697,6 +728,7 @@ namespace visage {
      * @param flex True to use a flex layout, false otherwise.
      */
     void setFlexLayout(bool flex) { layout().setFlex(flex); }
+
     /**
      * @brief Gets the x-coordinate of this frame.
      * @return The x-coordinate.
@@ -785,6 +817,7 @@ namespace visage {
      * @return The relative bounds.
      */
     Bounds relativeBounds(const Frame* other) const;
+
     /**
      * @brief Checks if this frame accepts keystrokes.
      * @return True if the frame accepts keystrokes, false otherwise.
@@ -795,6 +828,7 @@ namespace visage {
      * @param accepts_keystrokes True to accept keystrokes, false otherwise.
      */
     void setAcceptsKeystrokes(bool accepts_keystrokes) { accepts_keystrokes_ = accepts_keystrokes; }
+
     /**
      * @brief Checks if this frame receives mouse events from its children.
      * @return True if the frame receives child mouse events, false otherwise.
@@ -819,6 +853,7 @@ namespace visage {
       ignores_mouse_events_ = ignore;
       pass_mouse_events_to_children_ = pass_to_children;
     }
+
     /**
      * @brief Checks if this frame has keyboard focus.
      * @return True if the frame has keyboard focus, false otherwise.
@@ -841,11 +876,13 @@ namespace visage {
      * @return True if a text receiver was focused, false otherwise.
      */
     bool focusPreviousTextReceiver(const Frame* starting_child = nullptr) const;
+
     /**
      * @brief Draws the frame to its region on the given canvas.
      * @param canvas The canvas to draw on.
      */
     void drawToRegion(Canvas& canvas);
+
     /**
      * @brief Sets the DPI scale for this frame and its children.
      * @param dpi_scale The new DPI scale.
@@ -862,11 +899,13 @@ namespace visage {
       for (Frame* child : children_)
         child->setDpiScale(dpi_scale);
     }
+
     /**
      * @brief Gets the DPI scale of this frame.
      * @return The DPI scale.
      */
     float dpiScale() const { return dpi_scale_; }
+
     /**
      * @brief Requests a redraw of the frame through the event handler.
      * @return True if the request was sent, false otherwise.
@@ -878,6 +917,7 @@ namespace visage {
       }
       return false;
     }
+
     /**
      * @brief Requests keyboard focus for the frame through the event handler.
      */
@@ -885,6 +925,7 @@ namespace visage {
       if (event_handler_ && event_handler_->request_keyboard_focus)
         event_handler_->request_keyboard_focus(this);
     }
+
     /**
      * @brief Notifies the frame and its children that they are being removed from the hierarchy.
      */
@@ -895,6 +936,7 @@ namespace visage {
       if (event_handler_ && event_handler_->remove_from_hierarchy)
         event_handler_->remove_from_hierarchy(this);
     }
+
     /**
      * @brief Sets the mouse relative mode through the event handler.
      * @param visible True to enable relative mode, false to disable it.
@@ -903,6 +945,7 @@ namespace visage {
       if (event_handler_ && event_handler_->set_mouse_relative_mode)
         event_handler_->set_mouse_relative_mode(visible);
     }
+
     /**
      * @brief Sets the cursor style through the event handler.
      * @param style The new cursor style.
@@ -911,6 +954,7 @@ namespace visage {
       if (event_handler_ && event_handler_->set_cursor_style)
         event_handler_->set_cursor_style(style);
     }
+
     /**
      * @brief Sets the cursor visibility through the event handler.
      * @param visible True to make the cursor visible, false to hide it.
@@ -919,6 +963,7 @@ namespace visage {
       if (event_handler_ && event_handler_->set_cursor_visible)
         event_handler_->set_cursor_visible(visible);
     }
+
     /**
      * @brief Reads text from the clipboard through the event handler.
      * @return The text from the clipboard.
@@ -928,6 +973,7 @@ namespace visage {
         return event_handler_->read_clipboard_text();
       return "";
     }
+
     /**
      * @brief Sets the clipboard text through the event handler.
      * @param text The text to set.
@@ -936,6 +982,7 @@ namespace visage {
       if (event_handler_ && event_handler_->set_clipboard_text)
         event_handler_->set_clipboard_text(text);
     }
+
     /**
      * @brief Processes a mouse enter event.
      * @param e The mouse event.
@@ -979,8 +1026,9 @@ namespace visage {
      */
     void processFocusChanged(bool is_focused, bool was_clicked) {
       keyboard_focus_ = is_focused && accepts_keystrokes_;
-      focusChanged(is_focused, was_clicked);
+      on_focus_change_.callback(is_focused, was_clicked);
     }
+
     /**
      * @brief Processes a key press event.
      * @param e The key event.
@@ -998,6 +1046,7 @@ namespace visage {
      * @param text The text that was input.
      */
     void processTextInput(const std::string& text) { textInput(text); }
+
     /**
      * @brief Gets a value from the palette.
      * @param value_id The ID of the value to get.
@@ -1010,6 +1059,7 @@ namespace visage {
      * @return The palette color as a Brush.
      */
     Brush paletteColor(theme::ColorId color_id) const;
+
     /**
      * @brief Adds an undoable action to the undo history.
      * @param action A unique_ptr to the UndoableAction.

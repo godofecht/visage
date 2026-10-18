@@ -1,5 +1,6 @@
 file(GLOB HEADERS *.h)
 file(GLOB SOURCE_FILES *.cpp)
+
 if (WIN32)
   list(APPEND SOURCE_FILES win32/emoji_win32.cpp)
   set(WIN_LIBS d2d1 dwrite Windowscodecs)
@@ -95,7 +96,6 @@ target_link_libraries(
   bgfx
   bx
   bimg_decode
-  bimg_encode
   freetype
   ${WIN_LIBS}
   ${METAL_LIBS}
@@ -149,4 +149,3 @@ set_target_properties(freetype PROPERTIES FOLDER "visage/third_party")
 if (APPLE)
   target_compile_options(VisageGraphics PRIVATE -fobjc-arc)
 endif ()
-

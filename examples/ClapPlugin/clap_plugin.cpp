@@ -97,6 +97,7 @@ void ClapPlugin::guiDestroy() noexcept {
 #endif
 
   app_->close();
+  app_ = nullptr;
 }
 
 bool ClapPlugin::guiSetParent(const clap_window* window) noexcept {

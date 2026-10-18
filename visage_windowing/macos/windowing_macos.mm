@@ -60,7 +60,7 @@ namespace visage {
     bool requestAllToClose() const {
       bool result = true;
       for (auto& window : native_window_lookup_) {
-        if (!window.second->closeRequested())
+        if (!window.second->handleCloseRequested())
           result = false;
       }
       return result;
@@ -155,17 +155,6 @@ namespace visage {
       [NSCursor hide];
   }
 
-  CGRect activeWindowBounds() {
-    NSArray* windows = [NSApp windows];
-
-    for (NSWindow* window in windows) {
-      if ([window isMainWindow])
-        return [window frame];
-    }
-
-    return NSMakeRect(0, 0, 0, 0);
-  }
-
   void setCursorScreenPosition(Point screen_position) {
     CGPoint position = CGPointMake(screen_position.x, screen_position.y);
     CGAssociateMouseAndMouseCursorPosition(false);
@@ -174,9 +163,22 @@ namespace visage {
   }
 
   void setCursorPosition(Point window_position) {
-    CGRect window_bounds = activeWindowBounds();
-    float x = window_bounds.origin.x + window_position.x;
-    float y = window_bounds.origin.y + window_position.y;
+    NSWindow* window = [NSApp mainWindow];
+    if (!window)
+      return;
+
+    NSScreen* screen = [window screen];
+    if (!screen)
+      return;
+
+    NSRect content_rect = [[window contentView] frame];
+    NSRect screen_rect = [window convertRectToScreen:content_rect];
+
+    float screen_height = [screen frame].size.height;
+
+    float x = screen_rect.origin.x + window_position.x;
+    float y = screen_height - NSMaxY(screen_rect) + window_position.y;
+
     setCursorScreenPosition({ x, y });
   }
 
@@ -692,7 +694,7 @@ namespace visage {
 - (BOOL)windowShouldClose:(NSWindow*)sender {
   NSView* view = [sender contentView];
   visage::WindowMac* window = visage::NativeWindowLookup::instance().findWindow((__bridge void*)view);
-  return window->closeRequested();
+  return window->handleCloseRequested();
 }
 
 - (void)windowWillClose:(NSNotification*)notification {
@@ -870,6 +872,7 @@ namespace visage {
 
   WindowMac::WindowMac(int width, int height, float scale, void* parent_handle) :
       Window(width, height) {
+    setDpiScale(scale);
     parent_view_ = (__bridge NSView*)parent_handle;
     CGRect view_frame = CGRectMake(0.0f, 0.0f, width / scale, height / scale);
 
@@ -976,7 +979,7 @@ namespace visage {
       else
         [window_handle_ makeKeyAndOrderFront:nil];
     }
-    notifyShow();
+    handleWindowShown();
   }
 
   void WindowMac::showMaximized() {
@@ -985,13 +988,13 @@ namespace visage {
 
     [window_handle_ zoom:nil];
     [window_handle_ makeKeyAndOrderFront:nil];
-    notifyShow();
+    handleWindowShown();
   }
 
   void WindowMac::hide() {
     if (window_handle_ && parent_view_ == nullptr) {
       [window_handle_ orderOut:nil];
-      notifyHide();
+      handleWindowHidden();
     }
   }
 
@@ -1010,7 +1013,7 @@ namespace visage {
   IPoint WindowMac::maxWindowDimensions() const {
     Point borders = windowBorderSize(window_handle_);
 
-    NSScreen* screen = [window_handle_ screen];
+    NSScreen* screen = [window_handle_ screen] ?: [NSScreen mainScreen];
     NSRect visible_frame = [screen visibleFrame];
 
     int display_width = dpiScale() * (visible_frame.size.width - borders.x);
