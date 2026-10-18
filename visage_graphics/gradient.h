@@ -37,6 +37,8 @@ namespace visage {
   class Gradient {
   public:
     static constexpr int kMaxGradientResolution = 512;
+    static Gradient kViridis;
+    static Gradient kMagma;
 
     static int compare(const Gradient& a, const Gradient& b) {
       if (a.numColors() < b.numColors())
@@ -286,6 +288,7 @@ namespace visage {
       for (const auto& stale : stale_gradients_) {
         gradients_.erase(stale.first);
         atlas_map_.removeRect(stale.second);
+        references_.erase(stale.first);
       }
       stale_gradients_.clear();
     }
@@ -319,6 +322,7 @@ namespace visage {
     std::map<Gradient, const PackedGradientRect*> stale_gradients_;
 
     bool hdr_ = false;
+    bool repacked_ = false;
     PackedAtlasMap<const PackedGradientRect*> atlas_map_;
     std::unique_ptr<GradientAtlasTexture> texture_;
     std::shared_ptr<GradientAtlas*> reference_;

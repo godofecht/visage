@@ -72,8 +72,9 @@ namespace visage {
   void setImageAtlasUniform(const BatchVector<ImageWrapper>& batches);
   void setGraphDataUniform(const BatchVector<GraphLineWrapper>& batches);
   void setGraphDataUniform(const BatchVector<GraphFillWrapper>& batches);
+  void setHeatMapDataUniform(const BatchVector<HeatMapWrapper>& batches);
+  void setPathDataUniform(const BatchVector<PathFillWrapper>& batches);
 
-  void submitPathFill(const PathFillWrapper& path_fill_wrapper, const Layer& layer, int submit_pass);
   void submitText(const BatchVector<TextBlock>& batches, const Layer& layer, int submit_pass);
   void submitShader(const BatchVector<ShaderWrapper>& batches, const Layer& layer, int submit_pass);
   void submitSampleRegions(const BatchVector<SampleRegion>& batches, const Layer& layer, int submit_pass);
@@ -136,15 +137,9 @@ namespace visage {
   template<>
   inline void submitShapes<PathFillWrapper>(const BatchVector<PathFillWrapper>& batches,
                                             BlendMode state, Layer& layer, int submit_pass) {
-    for (const auto& batch : batches) {
-      for (const PathFillWrapper& path_wrapper : *batch.shapes) {
-        PathFillWrapper path = path_wrapper;
-        path.x = batch.x + path_wrapper.x;
-        path.y = batch.y + path_wrapper.y;
-        setBlendMode(state);
-        submitPathFill(path, layer, submit_pass);
-      }
-    }
+    setBlendMode(state);
+    setPathDataUniform(batches);
+    submitBaseShapes(batches, state, layer, submit_pass);
   }
 
   template<>
@@ -168,6 +163,14 @@ namespace visage {
                                              BlendMode state, Layer& layer, int submit_pass) {
     setBlendMode(state);
     setGraphDataUniform(batches);
+    submitBaseShapes(batches, state, layer, submit_pass);
+  }
+
+  template<>
+  inline void submitShapes<HeatMapWrapper>(const BatchVector<HeatMapWrapper>& batches,
+                                           BlendMode state, Layer& layer, int submit_pass) {
+    setBlendMode(state);
+    setHeatMapDataUniform(batches);
     submitBaseShapes(batches, state, layer, submit_pass);
   }
 

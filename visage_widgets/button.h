@@ -45,16 +45,19 @@ namespace visage {
      * @brief Default constructor.
      */
     Button() { hover_amount_.setTargetValue(1.0f); }
+
     /**
      * @brief Constructs a Button with a given name.
      * @param name The name of the button.
      */
     explicit Button(const std::string& name) : Frame(name) { hover_amount_.setTargetValue(1.0f); }
+
     /**
      * @brief Returns the callback list for the toggle event.
      * @return A reference to the on_toggle_ callback list.
      */
     auto& onToggle() { return on_toggle_; }
+
     /**
      * @brief Toggles the state of the button.
      * @return True if the state was changed, false otherwise.
@@ -78,6 +81,7 @@ namespace visage {
      * @param on The new toggle state.
      */
     void notify(bool on) { on_toggle_.callback(this, on); }
+
     /**
      * @brief Draws the button.
      * @param canvas The canvas to draw on.
@@ -89,6 +93,7 @@ namespace visage {
      * @param hover_amount The amount of hover to apply (0.0 to 1.0).
      */
     virtual void draw(Canvas& canvas, float hover_amount) { }
+
     /**
      * @brief Called when the mouse enters the button.
      * @param e The mouse event.
@@ -109,6 +114,7 @@ namespace visage {
      * @param e The mouse event.
      */
     void mouseUp(const MouseEvent& e) override;
+
     /**
      * @brief Sets whether the button should toggle on mouse down.
      * @param mouse_down True to toggle on mouse down, false otherwise.
@@ -159,6 +165,7 @@ namespace visage {
 
     VISAGE_LEAK_CHECKER(Button)
   };
+
   /**
    * @class UiButton
    * @brief A standard UI button with text.
@@ -174,6 +181,7 @@ namespace visage {
     VISAGE_THEME_DEFINE_COLOR(UiActionButtonBackgroundHover);
     VISAGE_THEME_DEFINE_COLOR(UiActionButtonText);
     VISAGE_THEME_DEFINE_COLOR(UiActionButtonTextHover);
+
     /**
      * @brief Constructs a UiButton with the given text.
      * @param text The text to display on the button.
@@ -189,6 +197,7 @@ namespace visage {
      * @param font The font to use for the text.
      */
     explicit UiButton(const std::string& text, const Font& font);
+
     /**
      * @brief Draws the background of the button.
      * @param canvas The canvas to draw on.
@@ -231,6 +240,7 @@ namespace visage {
     bool action_ = false;
     bool border_when_inactive_ = false;
   };
+
   /**
    * @class IconButton
    * @brief A button that displays an SVG icon.
@@ -241,11 +251,13 @@ namespace visage {
      * @brief The default shadow radius for the icon.
      */
     static constexpr float kDefaultShadowRadius = 3.0f;
+
     /**
      * @brief Constructs an IconButton.
      * @param shadow If true, a shadow will be displayed behind the icon.
      */
     explicit IconButton(bool shadow = false) { initSettings(shadow); }
+
     /**
      * @brief Constructs an IconButton with the given icon.
      * @param icon The Svg object to display.
@@ -255,6 +267,7 @@ namespace visage {
       setIcon(icon);
       initSettings(shadow);
     }
+
     /**
      * @brief Constructs an IconButton with an icon from an embedded file.
      * @param icon_file The embedded file containing the SVG data.
@@ -264,12 +277,17 @@ namespace visage {
       setIcon(icon_file);
       initSettings(shadow);
     }
+
     /**
      * @brief Constructs an IconButton with an icon from raw SVG data.
      * @param svg A pointer to the SVG data.
      * @param svg_size The size of the SVG data.
      */
-    IconButton(const unsigned char* svg, int svg_size) { setIcon(svg, svg_size); }
+    IconButton(const unsigned char* svg, int svg_size, bool shadow = false) {
+      setIcon(svg, svg_size);
+      initSettings(shadow);
+    }
+
     /**
      * @brief Sets the icon from an embedded file.
      * @param icon_file The embedded file containing the SVG data.
@@ -297,6 +315,7 @@ namespace visage {
       icon_.setBounds(localBounds());
       shadow_.setBounds(localBounds());
     }
+
     /**
      * @brief Sets the shadow radius for the icon.
      * @param radius The new shadow radius.
@@ -305,6 +324,7 @@ namespace visage {
       shadow_radius_ = radius;
       computeShadowRadius();
     }
+
     /**
      * @brief Sets the margin for the icon.
      * @param margin The new margin.
@@ -338,6 +358,7 @@ namespace visage {
   };
 
   class ButtonChangeAction;
+
   /**
    * @class ToggleButton
    * @brief A button that can be toggled on and off.
@@ -349,6 +370,7 @@ namespace visage {
     VISAGE_THEME_DEFINE_COLOR(ToggleButtonOffHover);
     VISAGE_THEME_DEFINE_COLOR(ToggleButtonOn);
     VISAGE_THEME_DEFINE_COLOR(ToggleButtonOnHover);
+
     /**
      * @brief Default constructor.
      */
@@ -374,6 +396,7 @@ namespace visage {
       redraw();
       notify(toggled);
     }
+
     /**
      * @brief Checks if the button is toggled.
      * @return True if the button is toggled, false otherwise.
@@ -391,6 +414,7 @@ namespace visage {
 
     VISAGE_LEAK_CHECKER(ToggleButton)
   };
+
   /**
    * @class ButtonChangeAction
    * @brief An undoable action for a toggle button change.
@@ -412,6 +436,7 @@ namespace visage {
     ToggleButton* button_ = nullptr;
     bool toggled_on_ = false;
   };
+
   /**
    * @class ToggleIconButton
    * @brief A toggle button that displays an SVG icon.
@@ -422,6 +447,7 @@ namespace visage {
      * @brief The default shadow radius for the icon.
      */
     static constexpr float kDefaultShadowRadius = 3.0f;
+
     /**
      * @brief Constructs a ToggleIconButton with the given icon.
      * @param icon The Svg object to display.
@@ -431,6 +457,7 @@ namespace visage {
       setIcon(icon);
       initSettings(shadow);
     }
+
     /**
      * @brief Constructs a ToggleIconButton with the given name and icon.
      * @param name The name of the button.
@@ -442,6 +469,12 @@ namespace visage {
       setIcon(icon);
       initSettings(shadow);
     }
+
+    ToggleIconButton(const EmbeddedFile& icon_file, bool shadow = false) : ToggleButton() {
+      setIcon(icon_file);
+      initSettings(shadow);
+    }
+
     /**
      * @brief Constructs a ToggleIconButton with an icon from raw SVG data.
      * @param svg A pointer to the SVG data.
@@ -452,6 +485,7 @@ namespace visage {
       setIcon({ svg, svg_size });
       initSettings(shadow);
     }
+
     /**
      * @brief Constructs a ToggleIconButton with a name and an icon from raw SVG data.
      * @param name The name of the button.
@@ -464,6 +498,9 @@ namespace visage {
       setIcon({ svg, svg_size });
       initSettings(shadow);
     }
+
+    void setIcon(const EmbeddedFile& icon_file) { setIcon({ icon_file.data, icon_file.size }); }
+
     /**
      * @brief Sets the icon from an Svg object.
      * @param icon The Svg object to display.
@@ -475,6 +512,7 @@ namespace visage {
 
     void draw(Canvas& canvas, float hover_amount) override;
     void resized() override;
+
     /**
      * @brief Sets the shadow radius for the icon.
      * @param radius The new shadow radius.
@@ -483,6 +521,7 @@ namespace visage {
       shadow_radius_ = radius;
       computeShadowRadius();
     }
+
     /**
      * @brief Sets the margin for the icon.
      * @param margin The new margin.
@@ -515,6 +554,7 @@ namespace visage {
     Dimension shadow_radius_;
     Dimension margin_;
   };
+
   /**
    * @class ToggleTextButton
    * @brief A toggle button that displays text.
@@ -532,6 +572,7 @@ namespace visage {
      * @param font The font to use for the text.
      */
     explicit ToggleTextButton(const std::string& name, const Font& font);
+
     /**
      * @brief Draws the background of the button.
      * @param canvas The canvas to draw on.

@@ -81,6 +81,82 @@ namespace visage {
     std::vector<float> y_values_;
   };
 
+  class HeatMapData {
+  public:
+    HeatMapData(int width = 0, int height = 0) :
+        width_(width), height_(height), values_(width * height, 0.0f) { }
+
+    void setDimensions(int width, int height) {
+      width_ = width;
+      height_ = height;
+      values_.resize(width * height, 0.0f);
+    }
+
+    float maxValue() const {
+      float max_value = 0.0f;
+      for (const auto& value : values_) {
+        if (value > max_value)
+          max_value = value;
+      }
+      return max_value;
+    }
+
+    float minValue() const {
+      if (values_.empty())
+        return 0.0f;
+
+      float min_value = values_[0];
+      for (const auto& value : values_) {
+        if (value < min_value)
+          min_value = value;
+      }
+      return min_value;
+    }
+
+    void scale(float scale) {
+      for (auto& value : values_)
+        value *= scale;
+    }
+
+    void normalize() {
+      float max_value = maxValue();
+
+      if (max_value > 0.0f)
+        scale(1.0f / max_value);
+    }
+
+    void setOctaves(float octaves) { octaves_ = octaves; }
+    float octaves() const { return octaves_; }
+
+    int width() const { return width_; }
+    int height() const { return height_; }
+
+    void clear() { std::fill(values_.begin(), values_.end(), 0.0f); }
+
+    const unsigned char* data() const { return (const unsigned char*)values_.data(); }
+
+    void set(int x, int y, float value) {
+      VISAGE_ASSERT(x >= 0 && x < width_ && y >= 0 && y < height_);
+      values_[y * width_ + x] = value;
+    }
+
+    float& at(int x, int y) {
+      VISAGE_ASSERT(x >= 0 && x < width_ && y >= 0 && y < height_);
+      return values_[y * width_ + x];
+    }
+
+    const float& at(int x, int y) const {
+      VISAGE_ASSERT(x >= 0 && x < width_ && y >= 0 && y < height_);
+      return values_[y * width_ + x];
+    }
+
+  private:
+    int width_ = 0;
+    int height_ = 0;
+    float octaves_ = 0.0f;
+    std::vector<float> values_;
+  };
+
   class ImageAtlasTexture;
 
   class ImageAtlas {
@@ -154,11 +230,12 @@ namespace visage {
     virtual ~ImageAtlas();
 
     PackedImage addImage(const Image& image, bool force_update = false);
-    PackedImage addData(const unsigned char* data, int data_size);
+    PackedImage addData(const unsigned char* data, int width, int height = 1);
     void clearStaleImages() {
       for (const auto& stale : stale_images_) {
         images_.erase(stale.first);
         atlas_map_.removeRect(stale.second);
+        references_.erase(stale.first);
       }
       stale_images_.clear();
     }
