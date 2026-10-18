@@ -88,6 +88,14 @@ target_compile_options(bimg_decode PRIVATE ${DISABLE_WARNINGS})
 target_compile_options(bimg_encode PRIVATE ${DISABLE_WARNINGS})
 target_compile_options(bimg PRIVATE ${DISABLE_WARNINGS})
 
+# bimg_encode brings in NVTT's host-CPU-specific BC6H encoder, which cannot
+# compile under Emscripten (POSH cannot determine target CPU). Runtime drawing
+# only needs bimg_decode; keep encoding available on desktop builds.
+set(VISAGE_IMAGE_ENCODER_LIBS)
+if (NOT EMSCRIPTEN)
+  list(APPEND VISAGE_IMAGE_ENCODER_LIBS bimg_encode)
+endif ()
+
 target_link_libraries(
   VisageGraphics
   PRIVATE
@@ -95,7 +103,7 @@ target_link_libraries(
   bgfx
   bx
   bimg_decode
-  bimg_encode
+  ${VISAGE_IMAGE_ENCODER_LIBS}
   freetype
   ${WIN_LIBS}
   ${METAL_LIBS}
