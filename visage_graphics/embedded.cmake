@@ -9,12 +9,16 @@ function(visage_embed_shaders project include_filename namespace original_shader
   set(SPIRV_FOLDER ${CMAKE_CURRENT_BINARY_DIR}/shaders/spirv)
   set(ESSL_FOLDER ${CMAKE_CURRENT_BINARY_DIR}/shaders/essl)
 
-  if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-    set(SHADERC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/bin/win32/shaderc.exe")
-  elseif (CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
-    set(SHADERC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/bin/macos/shaderc")
-  elseif (CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
-    set(SHADERC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/bin/linux/shaderc")
+  if(DEFINED VISAGE_SHADERC_EXECUTABLE AND NOT "${VISAGE_SHADERC_EXECUTABLE}" STREQUAL "")
+    set(SHADERC "${VISAGE_SHADERC_EXECUTABLE}")
+  else()
+    if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+      set(SHADERC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/bin/win32/shaderc.exe")
+    elseif (CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+      set(SHADERC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/bin/macos/shaderc")
+    elseif (CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+      set(SHADERC "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/bin/linux/shaderc")
+    endif()
   endif()
 
   file(MAKE_DIRECTORY ${SHADER_FOLDER})
@@ -39,6 +43,86 @@ function(visage_embed_shaders project include_filename namespace original_shader
     set(SHADER_PLATFORM "linux")
   endif()
 
+  # CMake 4.5 template rules are opt-in until the 4.5 generators have been
+  # exercised on the macOS/Windows/Linux CI matrix. The old per-output
+  # commands remain the default for downstream projects using CMake >= 3.17.
+  if(VISAGE_USE_CUSTOM_RULES)
+    if(CMAKE_VERSION VERSION_LESS 4.5)
+      message(FATAL_ERROR "VISAGE_USE_CUSTOM_RULES requires CMake 4.5 or later")
+    endif()
+
+    if(OPENGLES)
+      set(_visage_shader_flavour essl)
+      set(_visage_shader_profile 100_es)
+      set(_visage_shader_opt -O3)
+    elseif(DIRECTX)
+      set(_visage_shader_flavour dx)
+      set(_visage_shader_profile s_4_0)
+      set(_visage_shader_opt -O3)
+    elseif(METAL)
+      set(_visage_shader_flavour metal)
+      set(_visage_shader_profile metal)
+      set(_visage_shader_opt)
+    elseif(OPENGL)
+      set(_visage_shader_flavour glsl)
+      set(_visage_shader_profile 120)
+      set(_visage_shader_opt)
+    elseif(VULKAN)
+      set(_visage_shader_flavour spirv)
+      set(_visage_shader_profile spirv)
+      set(_visage_shader_opt)
+    else()
+      message(FATAL_ERROR "No shader backend selected for Visage custom rules")
+    endif()
+
+    # The rule is instantiated automatically for every file in its typed file
+    # set. Keep the old output paths so the embedding pipeline is unchanged.
+    set(_visage_output "<CURRENT_BINARY_DIR>/shaders/${_visage_shader_flavour}/<BASE_NAME>")
+    add_custom_rule(visage_vertex_shader
+      OUTPUT "${_visage_output}"
+      COMMAND "${SHADERC}" -i "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/shaders"
+              ${_visage_shader_opt}
+              -f "<SOURCE>" -o "${_visage_output}"
+              --type v --platform "${SHADER_PLATFORM}" -p "${_visage_shader_profile}"
+      DEPENDS ${SHADER_INCLUDES}
+    )
+    add_custom_rule(visage_fragment_shader
+      OUTPUT "${_visage_output}"
+      COMMAND "${SHADERC}" -i "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/shaders"
+              ${_visage_shader_opt}
+              -f "<SOURCE>" -o "${_visage_output}"
+              --type f --platform "${SHADER_PLATFORM}" -p "${_visage_shader_profile}"
+      DEPENDS ${SHADER_INCLUDES}
+    )
+
+    set(_visage_vertex_files)
+    set(_visage_fragment_files)
+    foreach(SHADER IN LISTS original_shaders)
+      get_filename_component(SHADER_NAME "${SHADER}" NAME_WE)
+      list(APPEND SHADER_BINS "${SHADER_FOLDER}/${_visage_shader_flavour}/${SHADER_NAME}")
+      if(SHADER_NAME MATCHES "^fs_")
+        list(APPEND _visage_fragment_files "${SHADER}")
+      else()
+        list(APPEND _visage_vertex_files "${SHADER}")
+      endif()
+    endforeach()
+
+    # A separate target owns the compilation file sets. Resource embedding
+    # consumes their outputs, but must not itself own the shader compilation.
+    add_custom_target(VisageShaderCompilation)
+    if(_visage_vertex_files)
+      target_sources(VisageShaderCompilation PRIVATE
+        FILE_SET visage_vertex_files TYPE visage_vertex_shader
+        BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
+        FILES ${_visage_vertex_files})
+    endif()
+    if(_visage_fragment_files)
+      target_sources(VisageShaderCompilation PRIVATE
+        FILE_SET visage_fragment_files TYPE visage_fragment_shader
+        BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
+        FILES ${_visage_fragment_files})
+    endif()
+  else()
   foreach(SHADER ${original_shaders})
     get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
 
@@ -97,6 +181,7 @@ function(visage_embed_shaders project include_filename namespace original_shader
       )
     endif()
   endforeach()
+  endif()
 
   set(SHADER_RESOURCES
     ${SHADER_BINS}
@@ -105,6 +190,9 @@ function(visage_embed_shaders project include_filename namespace original_shader
   )
 
   add_embedded_resources(${project} ${include_filename} ${namespace} "${SHADER_RESOURCES}")
+  if(VISAGE_USE_CUSTOM_RULES)
+    add_dependencies(${project} VisageShaderCompilation)
+  endif()
   target_sources(${project} PRIVATE ${original_shaders})
   source_group("Shaders" FILES ${original_shaders})
 endfunction()
