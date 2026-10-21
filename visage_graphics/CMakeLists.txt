@@ -88,6 +88,15 @@ target_compile_options(bimg_decode PRIVATE ${DISABLE_WARNINGS})
 target_compile_options(bimg_encode PRIVATE ${DISABLE_WARNINGS})
 target_compile_options(bimg PRIVATE ${DISABLE_WARNINGS})
 
+# NVTT in bimg_encode is a host-side texture encoder and its POSH CPU
+# detection does not support Emscripten/wasm. Runtime image decoding remains
+# linked on every platform; leave the encoder out of wasm builds.
+if (EMSCRIPTEN)
+  set(VISAGE_BIMG_ENCODER "")
+else ()
+  set(VISAGE_BIMG_ENCODER bimg_encode)
+endif ()
+
 target_link_libraries(
   VisageGraphics
   PRIVATE
@@ -95,7 +104,7 @@ target_link_libraries(
   bgfx
   bx
   bimg_decode
-  bimg_encode
+  ${VISAGE_BIMG_ENCODER}
   freetype
   ${WIN_LIBS}
   ${METAL_LIBS}
