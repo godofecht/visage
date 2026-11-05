@@ -1490,7 +1490,7 @@ namespace visage {
 
         if (event.type == DestroyNotify ||
             (event.type == ClientMessage && event.xclient.data.l[0] == x11_->deleteMessage())) {
-          if (window->closeRequested()) {
+          if (window->handleCloseRequested()) {
             NativeWindowLookup::instance().removeWindow(window);
             window->hide();
             if (!NativeWindowLookup::instance().anyWindowOpen())
@@ -1534,7 +1534,7 @@ namespace visage {
     XMapWindow(x11_->display(), window_handle_);
     XSetWMProtocols(x11_->display(), window_handle_, x11_->deleteMessageRef(), 1);
     XFlush(x11_->display());
-    notifyShow();
+    handleWindowShown();
   }
 
   void WindowX11::showMaximized() {
@@ -1577,7 +1577,7 @@ namespace visage {
     ::Display* display = x11_->display();
     XUnmapWindow(display, window_handle_);
     XFlush(display);
-    notifyHide();
+    handleWindowHidden();
   }
 
   void WindowX11::close() {

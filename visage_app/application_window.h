@@ -26,6 +26,7 @@
 #include <visage_windowing/windowing.h>
 
 namespace visage {
+
   /**
    * @brief Represents the main application window.
    *
@@ -150,37 +151,16 @@ namespace visage {
      * @return True if the window is showing, false otherwise.
      */
     bool isShowing() const;
-
-    /**
-     * @brief Returns a callback list for the window show event.
-     * @return A reference to the on_show_ callback list.
-     */
-    auto& onShow() { return on_show_; }
-    /**
-     * @brief Returns a callback list for the window hide event.
-     * @return A reference to the on_hide_ callback list.
-     */
-    auto& onHide() { return on_hide_; }
-    /**
-     * @brief Returns a callback list for the window contents resized event.
-     * @return A reference to the on_window_contents_resized_ callback list.
-     */
-    auto& onWindowContentsResized() { return on_window_contents_resized_; }
-
     /**
      * @brief Runs the event loop for the window.
      */
     void runEventLoop();
 
   private:
-    void registerCallbacks();
     void showWindow(bool maximized);
 
     IPoint initial_position_;
     Window::Decoration decoration_ = Window::Decoration::Native;
-    CallbackList<void()> on_show_;
-    CallbackList<void()> on_hide_;
-    CallbackList<void()> on_window_contents_resized_;
     std::string title_;
     bool always_on_top_ = false;
     std::unique_ptr<Window> window_;

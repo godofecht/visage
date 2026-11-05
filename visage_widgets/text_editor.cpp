@@ -538,6 +538,8 @@ namespace visage {
       return focusNextTextReceiver();
     }
     if (code == KeyCode::Up) {
+      if (!text_.multiLine())
+        return moveCaretToTop(shift);
       if (modifier && shift)
         return false;
       if (modifier)
@@ -545,6 +547,8 @@ namespace visage {
       return moveCaretUp(shift);
     }
     if (code == KeyCode::Down) {
+      if (!text_.multiLine())
+        return moveCaretToEnd(shift);
       if (modifier && shift)
         return false;
       if (modifier)
@@ -802,8 +806,9 @@ namespace visage {
 
   bool TextEditor::undo() {
     if (undo_history_.empty())
-      return false;
+      return true;
 
+    action_state_ = kNone;
     undone_history_.emplace_back(text_.text(), caret_position_);
     std::pair<String, int> state = undo_history_.back();
     undo_history_.pop_back();

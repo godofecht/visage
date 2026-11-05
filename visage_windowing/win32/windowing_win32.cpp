@@ -626,6 +626,7 @@ namespace visage {
 
     HRESULT STDMETHODCALLTYPE DragEnter(IDataObject* data_object, DWORD key_state, POINTL point,
                                         DWORD* effect) override {
+      DpiAwareness dpi_awareness;
       IPoint position = dragPosition(point);
       files_ = dropFileList(data_object);
       if (window_->handleFileDrag(position.x, position.y, files_))
@@ -636,6 +637,7 @@ namespace visage {
     }
 
     HRESULT STDMETHODCALLTYPE DragOver(DWORD key_state, POINTL point, DWORD* effect) override {
+      DpiAwareness dpi_awareness;
       IPoint position = dragPosition(point);
       if (window_->handleFileDrag(position.x, position.y, files_))
         *effect = DROPEFFECT_COPY;
@@ -651,6 +653,7 @@ namespace visage {
 
     HRESULT STDMETHODCALLTYPE Drop(IDataObject* data_object, DWORD key_state, POINTL point,
                                    DWORD* effect) override {
+      DpiAwareness dpi_awareness;
       IPoint position = dragPosition(point);
       files_ = dropFileList(data_object);
       if (window_->handleFileDrop(position.x, position.y, files_))
@@ -1284,9 +1287,9 @@ namespace visage {
       }
     }
     if (msg == WM_QUERYENDSESSION)
-      return window->closeRequested();
+      return window->handleCloseRequested();
     if (msg == WM_CLOSE) {
-      if (!window->closeRequested())
+      if (!window->handleCloseRequested())
         return 0;
     }
     return windowProcedure(hwnd, msg, w_param, l_param);
@@ -1553,7 +1556,7 @@ namespace visage {
       v_blank_thread_ = std::make_unique<VBlankThread>(this);
       v_blank_thread_->start();
     }
-    notifyShow();
+    handleWindowShown();
   }
 
   void WindowWin32::show() {
@@ -1563,7 +1566,7 @@ namespace visage {
 
   void WindowWin32::hide() {
     ShowWindow(window_handle_, SW_HIDE);
-    notifyHide();
+    handleWindowHidden();
   }
 
   void WindowWin32::close() {

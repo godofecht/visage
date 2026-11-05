@@ -173,7 +173,9 @@ namespace visage {
       if (fill_brush.isNone())
         return;
 
-      canvas.setColor(fill_brush);
+      auto brush = fill_brush;
+      brush.transform(Transform::translation(x, y));
+      canvas.setColor(brush);
       context->fill_color = &fill_brush;
     }
 
@@ -189,7 +191,9 @@ namespace visage {
       if (stroke_brush.isNone())
         return;
 
-      canvas.setColor(stroke_brush);
+      auto brush = stroke_brush;
+      brush.transform(Transform::translation(x, y));
+      canvas.setColor(brush);
       context->stroke_color = &stroke_brush;
     }
 
@@ -383,13 +387,10 @@ namespace visage {
 
   void SvgDrawable::checkPathClipping(const Matrix& scale_matrix, const Bounds& view_box,
                                       std::map<std::string, SvgDrawable*>& clip_paths) {
-    if (is_clip_path) {
-      Path p;
-      path.clear();
-      unionPaths(&p);
-      path = p;
+    clipping_paths.clear();
+
+    if (is_clip_path)
       clip_paths[id] = this;
-    }
 
     int position = 0;
     auto tokens = parseFunctionTokens(clip_path_shape, position);
@@ -416,14 +417,14 @@ namespace visage {
           clip_drawable->initPaths(scale, view_box);
           clip_drawable->adjustPaths(scale, view_box, clip_paths);
 
-          Path clip_path;
-          clip_drawable->unionPaths(&clip_path);
-          clip_path.transform(Transform::translation(bounding_box.x(), bounding_box.y()) *
-                              Transform::scale(bounding_box.width(), bounding_box.height()));
-          applyClipping(&clip_path);
+          clip_drawable->gatherPaths(clipping_paths);
+          for (auto& clip_path : clipping_paths) {
+            clip_path.transform(Transform::translation(bounding_box.x(), bounding_box.y()) *
+                                Transform::scale(bounding_box.width(), bounding_box.height()));
+          }
         }
         else
-          applyClipping(&clip_drawable->path);
+          clip_drawable->gatherPaths(clipping_paths);
       }
 
       return;
@@ -438,7 +439,8 @@ namespace visage {
       clip_path.loadCommands(parseEllipseShape(tokens, bounding_box));
     else if (tokens[0] == "polygon" || tokens[0] == "polyline")
       clip_path.loadCommands(parsePolygonShape(tokens, 1, bounding_box));
-    applyClipping(&clip_path);
+
+    clipping_paths.push_back(clip_path);
   }
 
   void SvgDrawable::initPaths(const Matrix& scale_matrix, const Bounds& view_box) {
@@ -483,6 +485,7 @@ namespace visage {
         dashes.push_back(dash.first);
     }
 
+    float stroke_opacity = state.stroke_opacity;
     if (state.non_scaling_stroke) {
       auto inverted = path.transformed(scale_matrix);
       stroke_path = inverted.stroke(state.stroke_width, state.stroke_join, state.stroke_end_cap,
@@ -490,12 +493,15 @@ namespace visage {
       stroke_path.transform(scale_matrix.inversed());
     }
     else {
-      stroke_path = path.stroke(state.stroke_width, state.stroke_join, state.stroke_end_cap, dashes,
-                                dash_offset, state.stroke_miter_limit);
+      float multiplier = std::sqrt(std::abs(scale_matrix.determinant()));
+      float width = std::max(1.0f, state.stroke_width * multiplier) / multiplier;
+      stroke_opacity = state.stroke_opacity * state.stroke_width / width;
+      stroke_path = path.stroke(width, state.stroke_join, state.stroke_end_cap, dashes, dash_offset,
+                                state.stroke_miter_limit);
     }
     auto stroke_box = state.stroke_gradient.user_space ? view_box : path.boundingBox();
     stroke_brush = state.stroke_gradient.toBrush(stroke_box);
-    stroke_brush = stroke_brush.withMultipliedAlpha(state.stroke_opacity);
+    stroke_brush = stroke_brush.withMultipliedAlpha(stroke_opacity);
   }
 
   void SvgDrawable::adjustPaths(const Matrix& scale_matrix, const Bounds& view_box,
@@ -943,10 +949,12 @@ namespace visage {
       gradient_def.user_space = tag.data.attributes.at("gradientUnits") == "userSpaceOnUse";
 
     for (auto& child : tag.children) {
-      if (child.data.name != "stop" || !child.data.attributes.count("offset"))
+      if (child.data.name != "stop")
         continue;
 
-      float offset = parseNumber(child.data.attributes.at("offset"), 1.0f);
+      float offset = child.data.attributes.count("offset") ?
+                         parseNumber(child.data.attributes.at("offset"), 1.0f) :
+                         0.0f;
       gradient_def.gradient.addColorStop(parseStopColor(child), offset);
     }
 
@@ -1375,7 +1383,7 @@ namespace visage {
         return gradients_.at(id);
     }
 
-    if (color == "current-color")
+    if (color == "currentColor")
       return GradientDef::Type::CurrentColor;
     if (color == "context-fill")
       return GradientDef::Type::ContextFill;

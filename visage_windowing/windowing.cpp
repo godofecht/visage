@@ -57,6 +57,22 @@ namespace visage {
       event_handler_->handleAdjustResize(width, height, horizontal_resize, vertical_resize);
   }
 
+  void Window::handleWindowShown() {
+    if (event_handler_)
+      return event_handler_->handleWindowShown();
+  }
+
+  void Window::handleWindowHidden() {
+    if (event_handler_)
+      return event_handler_->handleWindowHidden();
+  }
+
+  bool Window::handleCloseRequested() {
+    if (event_handler_)
+      return event_handler_->handleCloseRequested();
+    return true;
+  }
+
   bool Window::handleKeyDown(KeyCode key_code, int modifiers, bool repeat) {
     if (event_handler_ == nullptr)
       return false;
@@ -94,7 +110,6 @@ namespace visage {
     client_width_ = width;
     client_height_ = height;
     windowContentsResized(client_width_, client_height_);
-    on_contents_resized_.callback();
   }
 
   bool Window::hasActiveTextEntry() const {

@@ -89,6 +89,16 @@ TEST_CASE("String comparison operators", "[utils]") {
   REQUIRE(bool(b >= a));
 }
 
+TEST_CASE("String natural comparison", "[utils]") {
+  String test1 = "file2.txt";
+  String test2 = "file10.txt";
+  String test3 = "file02.txt";
+  REQUIRE(test1.naturalCompare(test2) < 0);
+  REQUIRE(test2.naturalCompare(test1) > 0);
+  REQUIRE(test2.naturalCompare(test3) > 0);
+  REQUIRE(test3.naturalCompare(test2) < 0);
+}
+
 TEST_CASE("String contains and endsWith", "[utils]") {
   String test = "Hello World";
 
@@ -124,4 +134,24 @@ TEST_CASE("String numerical precision", "[utils]") {
   REQUIRE(test2.withPrecision(6).toUtf8() == "9.999549");
   REQUIRE(test2.withPrecision(7).toUtf8() == "9.9995493");
   REQUIRE(test2.withPrecision(8).toUtf8() == "9.99954930");
+}
+
+TEST_CASE("String toFloat", "[utils]") {
+  String test1 = "123.456";
+  REQUIRE(test1.toFloat() == Catch::Approx(123.456f));
+  String test2 = "invalid";
+  REQUIRE(test2.toFloat() == Catch::Approx(0.0f));
+  String test3 = "";
+  REQUIRE(test3.toFloat() == Catch::Approx(0.0f));
+}
+
+TEST_CASE("String toInt", "[utils]") {
+  String test1 = "12345";
+  REQUIRE(test1.toInt() == 12345);
+  String test2 = "-6789";
+  REQUIRE(test2.toInt() == -6789);
+  String test3 = "invalid";
+  REQUIRE(test3.toInt() == 0);
+  String test4 = "";
+  REQUIRE(test4.toInt() == 0);
 }

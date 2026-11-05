@@ -24,6 +24,7 @@
 #include "font.h"
 #include "graphics_utils.h"
 #include "layer.h"
+#include "path.h"
 #include "region.h"
 #include "screenshot.h"
 #include "shape_batcher.h"
@@ -39,6 +40,7 @@
 namespace visage {
   class Palette;
   class Shader;
+
   /**
    * @class Canvas
    * @brief A drawing surface for rendering 2D graphics.
@@ -53,11 +55,13 @@ namespace visage {
      * @brief The default power for squircles.
      */
     static constexpr float kDefaultSquirclePower = 4.0f;
+
     /**
      * @brief Checks if the swap chain is supported.
      * @return True if the swap chain is supported, false otherwise.
      */
     static bool swapChainSupported();
+
     /**
      * @struct State
      * @brief Represents the current drawing state of the canvas.
@@ -67,17 +71,20 @@ namespace visage {
       float y = 0;
       float scale = 1.0f;
       theme::OverrideId palette_override;
+      Brush set_brush;
       const PackedBrush* brush = nullptr;
       ClampBounds clamp;
       BlendMode blend_mode = BlendMode::Alpha;
       Region* current_region = nullptr;
     };
+
     /**
      * @brief Constructs a Canvas object.
      */
     Canvas();
     Canvas(const Canvas& other) = delete;
     Canvas& operator=(const Canvas&) = delete;
+
     /**
      * @brief Clears all drawn shapes from the canvas.
      */
@@ -88,6 +95,7 @@ namespace visage {
      * @return The number of shapes submitted.
      */
     int submit(int submit_pass = 0);
+
     /**
      * @brief Takes a screenshot of the canvas.
      * @return A const reference to the Screenshot object.
@@ -98,6 +106,7 @@ namespace visage {
      * @return A const reference to the Screenshot object.
      */
     const Screenshot& screenshot() const;
+
     /**
      * @brief Ensures that a layer at the given index exists.
      * @param layer The layer index.
@@ -112,6 +121,7 @@ namespace visage {
       ensureLayerExists(index);
       return layers_[index];
     }
+
     /**
      * @brief Invalidates a rectangle within a region on a specific layer.
      * @param rect The rectangle to invalidate.
@@ -138,6 +148,7 @@ namespace visage {
      * @param to The index of the layer to move to.
      */
     void changePackedLayer(Region* region, int from, int to);
+
     /**
      * @brief Pairs the canvas to a native window handle.
      * @param window_handle The native window handle.
@@ -149,6 +160,7 @@ namespace visage {
       composite_layer_.pairToWindow(window_handle, width, height);
       setDimensions(width, height);
     }
+
     /**
      * @brief Sets the canvas to be windowless.
      * @param width The width of the canvas.
@@ -159,6 +171,7 @@ namespace visage {
      * @brief Removes the canvas from the window it is paired with.
      */
     void removeFromWindow() { composite_layer_.removeFromWindow(); }
+
     /**
      * @brief Gets the width of the canvas.
      * @return The width of the canvas.
@@ -188,6 +201,7 @@ namespace visage {
      * @brief Sets the pixel scale to logical (DPI-aware).
      */
     void setLogicalPixelScale() { state_.scale = dpi_scale_; }
+
     /**
      * @brief Gets the DPI scale of the canvas.
      * @return The DPI scale.
@@ -213,16 +227,20 @@ namespace visage {
      * @return The frame count.
      */
     int frameCount() const { return render_frame_; }
+
     /**
      * @brief Sets the blend mode for subsequent drawing operations.
      * @param blend_mode The blend mode to use.
      */
     void setBlendMode(BlendMode blend_mode) { state_.blend_mode = blend_mode; }
+
+    const Brush& brush() { return state_.set_brush; }
     /**
      * @brief Sets the brush for subsequent drawing operations.
      * @param brush The brush to use.
      */
     void setBrush(const Brush& brush) {
+      state_.set_brush = brush;
       state_.brush = state_.current_region->addBrush(&gradient_atlas_, brush.gradient(),
                                                      brush.position() * state_.scale);
     }
@@ -246,6 +264,7 @@ namespace visage {
      * @param color_id The ID of the color in the theme.
      */
     void setColor(theme::ColorId color_id) { setBrush(color(color_id)); }
+
     /**
      * @brief Sets the color to a blend of two theme colors.
      * @param color_from The starting color ID.
@@ -255,6 +274,7 @@ namespace visage {
     void setBlendedColor(theme::ColorId color_from, theme::ColorId color_to, float t) {
       setBrush(blendedColor(color_from, color_to, t));
     }
+
     /**
      * @brief Fills the entire canvas with the current brush.
      */
@@ -262,6 +282,7 @@ namespace visage {
       addShape(Fill(state_.clamp, state_.brush, state_.x, state_.y,
                     state_.clamp.right - state_.clamp.left, state_.clamp.bottom - state_.clamp.top));
     }
+
     /**
      * @brief Fills a rectangular area with the current brush.
      * @param x The x-coordinate of the rectangle.
@@ -278,6 +299,7 @@ namespace visage {
       addShape(Fill(state_.clamp.clamp(fill_x, fill_y, fill_w, fill_h), state_.brush,
                     state_.x + fill_x, state_.y + fill_y, fill_w, fill_h));
     }
+
     /**
      * @brief Draws a circle.
      * @param x The x-coordinate of the center of the circle.
@@ -289,6 +311,7 @@ namespace visage {
       addShape(Circle(state_.clamp, state_.brush, state_.x + pixels(x), state_.y + pixels(y),
                       pixels(width)));
     }
+
     /**
      * @brief Draws a circle with a faded edge.
      * @param x The x-coordinate of the center of the circle.
@@ -302,6 +325,7 @@ namespace visage {
       circle.pixel_width = pixels(pixel_width);
       addShape(circle);
     }
+
     /**
      * @brief Draws a ring.
      * @param x The x-coordinate of the center of the ring.
@@ -328,6 +352,7 @@ namespace visage {
       float w = pixels(width);
       addShape(Squircle(state_.clamp, state_.brush, state_.x + pixels(x), state_.y + pixels(y), w, w, power));
     }
+
     /**
      * @brief Draws the border of a squircle.
      * @param x The x-coordinate of the top-left corner.
@@ -343,6 +368,7 @@ namespace visage {
       squircle.thickness = pixels(thickness);
       addShape(squircle);
     }
+
     /**
      * @brief Draws a superellipse.
      * @param x The x-coordinate of the top-left corner.
@@ -356,6 +382,7 @@ namespace visage {
       addShape(Squircle(state_.clamp, state_.brush, state_.x + pixels(x), state_.y + pixels(y),
                         pixels(width), pixels(height), pixels(power)));
     }
+
     /**
      * @brief Draws an arc with rounded ends.
      * @param x The x-coordinate of the center of the arc.
@@ -372,6 +399,7 @@ namespace visage {
       addShape(RoundedArc(state_.clamp, state_.brush, state_.x + pixels(x), state_.y + pixels(y), w,
                           w, pixels(thickness) + 1.0f, center_radians, radians));
     }
+
     /**
      * @brief Draws an arc with flat ends.
      * @param x The x-coordinate of the center of the arc.
@@ -388,6 +416,7 @@ namespace visage {
       addShape(FlatArc(state_.clamp, state_.brush, state_.x + pixels(x), state_.y + pixels(y), w, w,
                        pixels(thickness) + 1.0f, center_radians, radians));
     }
+
     /**
      * @brief Draws an arc.
      * @param x The x-coordinate of the center of the arc.
@@ -428,6 +457,7 @@ namespace visage {
       arc.pixel_width = shadow;
       addShape(arc);
     }
+
     /**
      * @brief Draws a shadow for a flat arc.
      * @param x The x-coordinate of the center of the arc.
@@ -450,6 +480,7 @@ namespace visage {
       arc.pixel_width = shadow;
       addShape(arc);
     }
+
     /**
      * @brief Draws a line segment.
      * @param a_x The x-coordinate of the start point.
@@ -464,6 +495,7 @@ namespace visage {
                  bool rounded) {
       addSegment(pixels(a_x), pixels(a_y), pixels(b_x), pixels(b_y), pixels(thickness), rounded);
     }
+
     /**
      * @brief Draws a quadratic Bezier curve.
      * @param a_x The x-coordinate of the start point.
@@ -493,6 +525,7 @@ namespace visage {
       addShape(Rectangle(state_.clamp, state_.brush, state_.x + pixels(x), state_.y + pixels(y),
                          pixels(width), pixels(height)));
     }
+
     /**
      * @brief Draws the border of a rectangle.
      * @param x The x-coordinate of the top-left corner.
@@ -508,6 +541,7 @@ namespace visage {
       border.thickness = pixels(thickness) + 1.0f;
       addShape(border);
     }
+
     /**
      * @brief Draws a rounded rectangle.
      * @param x The x-coordinate of the top-left corner.
@@ -521,6 +555,7 @@ namespace visage {
       addShape(RoundedRectangle(state_.clamp, state_.brush, state_.x + pixels(x), state_.y + pixels(y),
                                 pixels(width), pixels(height), std::max(1.0f, pixels(rounding))));
     }
+
     /**
      * @brief Draws a diamond shape.
      * @param x The x-coordinate of the top-left corner of the bounding box.
@@ -534,6 +569,7 @@ namespace visage {
       addShape(Diamond(state_.clamp, state_.brush, state_.x + pixels(x), state_.y + pixels(y), w, w,
                        std::max(1.0f, pixels(rounding))));
     }
+
     /**
      * @brief Draws a rectangle with rounded left corners.
      * @param x The x-coordinate of the top-left corner.
@@ -547,6 +583,7 @@ namespace visage {
                               const T5& rounding) {
       addLeftRoundedRectangle(pixels(x), pixels(y), pixels(width), pixels(height), pixels(rounding));
     }
+
     /**
      * @brief Draws a rectangle with rounded right corners.
      * @param x The x-coordinate of the top-left corner.
@@ -560,6 +597,7 @@ namespace visage {
                                const T5& rounding) {
       addRightRoundedRectangle(pixels(x), pixels(y), pixels(width), pixels(height), pixels(rounding));
     }
+
     /**
      * @brief Draws a rectangle with rounded top corners.
      * @param x The x-coordinate of the top-left corner.
@@ -572,6 +610,7 @@ namespace visage {
     void topRoundedRectangle(const T1& x, const T2& y, const T3& width, const T4& height, const T5& rounding) {
       addTopRoundedRectangle(pixels(x), pixels(y), pixels(width), pixels(height), pixels(rounding));
     }
+
     /**
      * @brief Draws a rectangle with rounded bottom corners.
      * @param x The x-coordinate of the top-left corner.
@@ -598,6 +637,7 @@ namespace visage {
     void rectangleShadow(const T1& x, const T2& y, const T3& width, const T4& height, const T5& shadow_width) {
       roundedRectangleShadow(x, y, width, height, 0.0f, shadow_width);
     }
+
     /**
      * @brief Draws a shadow for a rounded rectangle.
      * @param x The x-coordinate of the top-left corner.
@@ -616,6 +656,7 @@ namespace visage {
                                 pixels(width) + pixel_width, pixels(height) + pixel_width,
                                 std::max(1.0f, pixels(rounding) + 0.5f * pixel_width), pixel_width));
     }
+
     /**
      * @brief Draws the border of a rounded rectangle.
      * @param x The x-coordinate of the top-left corner.
@@ -631,6 +672,7 @@ namespace visage {
       addRoundedRectangleBorder(pixels(x), pixels(y), pixels(width), pixels(height),
                                 pixels(rounding), pixels(thickness));
     }
+
     /**
      * @brief Draws a triangle.
      * @param a_x The x-coordinate of the first vertex.
@@ -645,6 +687,7 @@ namespace visage {
       outerRoundedTriangleBorder(pixels(a_x), pixels(a_y), pixels(b_x), pixels(b_y), pixels(c_x),
                                  pixels(c_y), 0.0f);
     }
+
     /**
      * @brief Draws the border of a triangle.
      * @param a_x The x-coordinate of the first vertex.
@@ -661,6 +704,7 @@ namespace visage {
       outerRoundedTriangleBorder(pixels(a_x), pixels(a_y), pixels(b_x), pixels(b_y), pixels(c_x),
                                  pixels(c_y), 0.0f, pixels(thickness));
     }
+
     /**
      * @brief Draws the border of a rounded triangle.
      * @param a_x The x-coordinate of the first vertex.
@@ -678,6 +722,7 @@ namespace visage {
       addRoundedTriangleBorder(pixels(a_x), pixels(a_y), pixels(b_x), pixels(b_y), pixels(c_x),
                                pixels(c_y), pixels(rounding), pixels(thickness));
     }
+
     /**
      * @brief Draws a rounded triangle.
      * @param a_x The x-coordinate of the first vertex.
@@ -709,6 +754,7 @@ namespace visage {
       float h = width * 2.0f;
       outerRoundedTriangleBorder(x + width, y, x + width, y + h, x, y + h * 0.5f, 0.0f, width);
     }
+
     /**
      * @brief Draws a triangle pointing to the right.
      * @param triangle_x The x-coordinate of the leftmost point.
@@ -723,6 +769,7 @@ namespace visage {
       float h = width * 2.0f;
       outerRoundedTriangleBorder(x, y, x, y + h, x + width, y + h * 0.5f, 0.0f, width);
     }
+
     /**
      * @brief Draws a triangle pointing up.
      * @param triangle_x The x-coordinate of the leftmost point.
@@ -737,6 +784,7 @@ namespace visage {
       float w = width * 2.0f;
       outerRoundedTriangleBorder(x, y + width, x + w, y + width, x + w * 0.5f, y, 0.0f, width);
     }
+
     /**
      * @brief Draws a triangle pointing down.
      * @param triangle_x The x-coordinate of the leftmost point.
@@ -769,6 +817,7 @@ namespace visage {
                            text->font().withDpiScale(state_.scale), dir);
       addShape(std::move(text_block));
     }
+
     /**
      * @brief Draws a string of text.
      * @param string The string to draw.
@@ -788,6 +837,7 @@ namespace visage {
         text(stored_text, x, y, width, height, dir);
       }
     }
+
     /**
      * @brief Draws an SVG image.
      * @param svg The Svg object to draw.
@@ -796,8 +846,9 @@ namespace visage {
      */
     template<typename T1, typename T2>
     void svg(const Svg& svg, const T1& x, const T2& y) {
-      addSvg(svg, pixels(x), pixels(y), state_.scale * svg.width(), state_.scale * svg.height());
+      addSvg(svg, pixels(x) / state_.scale, pixels(y) / state_.scale, svg.width(), svg.height());
     }
+
     /**
      * @brief Draws an SVG image with a specified size.
      * @param svg The Svg object to draw.
@@ -808,8 +859,10 @@ namespace visage {
      */
     template<typename T1, typename T2, typename T3, typename T4>
     void svg(const Svg& svg, const T1& x, const T2& y, const T3& width, const T4& height) {
-      addSvg(svg, pixels(x), pixels(y), pixels(width), pixels(height));
+      addSvg(svg, pixels(x) / state_.scale, pixels(y) / state_.scale, pixels(width) / state_.scale,
+             pixels(height) / state_.scale);
     }
+
     /**
      * @brief Draws an SVG image from raw data.
      * @param svg_data A pointer to the SVG data.
@@ -822,8 +875,13 @@ namespace visage {
     template<typename T1, typename T2, typename T3, typename T4>
     void svg(const unsigned char* svg_data, int svg_size, const T1& x, const T2& y, const T3& width,
              const T4& height) {
-      svg(Svg(svg_data, svg_size), x, y, width, height);
+      Svg new_svg(svg_data, svg_size);
+      new_svg.setDimensions(pixels(width) / state_.scale, pixels(height) / state_.scale, state_.scale);
+      new_svg.setFillBrush(state_.set_brush);
+      new_svg.setStrokeBrush(state_.set_brush);
+      svg(new_svg, x, y, width, height);
     }
+
     /**
      * @brief Draws an SVG image from an embedded file.
      * @param file The embedded file containing the SVG data.
@@ -834,11 +892,7 @@ namespace visage {
      */
     template<typename T1, typename T2, typename T3, typename T4>
     void svg(const EmbeddedFile& file, const T1& x, const T2& y, const T3& width, const T4& height) {
-      Svg new_svg(file.data, file.size);
-      new_svg.setDimensions(pixels(width) / state_.scale, pixels(height) / state_.scale);
-      new_svg.setFillBrush(state_.brush->originalBrush());
-      new_svg.setStrokeBrush(state_.brush->originalBrush());
-      svg(new_svg, x, y, width, height);
+      svg(file.data, file.size, x, y, width, height);
     }
 
     /**
@@ -855,6 +909,7 @@ namespace visage {
                    const T4& height, const T5& thickness) {
       addGraphLine(data, pixels(x), pixels(y), pixels(width), pixels(height), pixels(thickness));
     }
+
     /**
      * @brief Draws a filled graph.
      * @param data The graph data to draw.
@@ -869,6 +924,15 @@ namespace visage {
                    const T4& height, float fill_center) {
       addGraphFill(data, pixels(x), pixels(y), pixels(width), pixels(height), fill_center);
     }
+
+    template<typename T1, typename T2, typename T3, typename T4>
+    void heatMap(const HeatMapData& data, const T1& x, const T2& y, const T3& width, const T4& height) {
+      if (data.width() == 0 || data.height() == 0)
+        return;
+
+      addHeatMap(data, pixels(x), pixels(y), pixels(width), pixels(height));
+    }
+
     /**
      * @brief Draws an image.
      * @param image The Image object to draw.
@@ -881,6 +945,7 @@ namespace visage {
       int h = std::round(pixels(image.height));
       addImage({ image.data, image.data_size, w, h }, pixels(x), pixels(y));
     }
+
     /**
      * @brief Draws an image from raw data.
      * @param image_data A pointer to the image data.
@@ -897,6 +962,7 @@ namespace visage {
       int h = std::round(pixels(height));
       addImage({ image_data, image_size, w, h }, pixels(x), pixels(y));
     }
+
     /**
      * @brief Draws an image from an embedded file.
      * @param image_file The embedded file containing the image data.
@@ -909,6 +975,7 @@ namespace visage {
     void image(const EmbeddedFile& image_file, const T1& x, const T2& y, const T3& width, const T4& height) {
       image(image_file.data, image_file.size, x, y, width, height);
     }
+
     /**
      * @brief Draws a shader.
      * @param shader A pointer to the Shader object to use.
@@ -937,8 +1004,9 @@ namespace visage {
         return;
 
       addShape(PathFillWrapper(state_.clamp, state_.brush, state_.x + pixels(x), state_.y + pixels(y),
-                               pixels(width), pixels(height), path, state_.scale));
+                               pixels(width), pixels(height), path, pathAtlas(), state_.scale));
     }
+
     /**
      * @brief Fills a path.
      * @param path The path to fill.
@@ -953,13 +1021,16 @@ namespace visage {
       auto bounding_box = path.boundingBox();
       addShape(PathFillWrapper(state_.clamp, state_.brush, state_.x + pixels(x),
                                state_.y + pixels(y), bounding_box.right() * state_.scale + 1.0f,
-                               bounding_box.bottom() * state_.scale + 1.0f, path, state_.scale));
+                               bounding_box.bottom() * state_.scale + 1.0f, path, pathAtlas(),
+                               state_.scale));
     }
+
     /**
      * @brief Fills a path at the origin.
      * @param path The path to fill.
      */
     void fill(const Path& path) { fill(path, 0, 0); }
+
     /**
      * @brief Strokes a path.
      * @param path The path to stroke.
@@ -993,6 +1064,7 @@ namespace visage {
      * @brief Saves the current drawing state.
      */
     void saveState() { state_memory_.push_back(state_); }
+
     /**
      * @brief Restores the previously saved drawing state.
      */
@@ -1003,6 +1075,7 @@ namespace visage {
         state_memory_.pop_back();
       }
     }
+
     /**
      * @brief Sets the drawing position.
      * @param x The x-coordinate to translate to.
@@ -1012,6 +1085,7 @@ namespace visage {
       state_.x += x * state_.scale;
       state_.y += y * state_.scale;
     }
+
     /**
      * @brief Adds a region to the canvas.
      * @param region The region to add.
@@ -1020,6 +1094,7 @@ namespace visage {
       default_region_.addRegion(region);
       region->setCanvas(this);
     }
+
     /**
      * @brief Begins drawing in a region.
      * @param region The region to draw in.
@@ -1035,10 +1110,12 @@ namespace visage {
       setClampBounds(0, 0, region->width(), region->height());
       state_.current_region = region;
     }
+
     /**
      * @brief Ends drawing in the current region.
      */
     void endRegion() { restoreState(); }
+
     /**
      * @brief Sets the palette for the canvas.
      * @param palette The palette to use.
@@ -1051,6 +1128,7 @@ namespace visage {
     void setPaletteOverride(theme::OverrideId override_id) {
       state_.palette_override = override_id;
     }
+
     /**
      * @brief Sets the clamping bounds for drawing.
      * @param x The x-coordinate of the top-left corner.
@@ -1078,6 +1156,7 @@ namespace visage {
       state_.clamp = state_.clamp.clamp(state_.x + x * state_.scale, state_.y + y * state_.scale,
                                         width * state_.scale, height * state_.scale);
     }
+
     /**
      * @brief Gets the current clamping bounds.
      * @return A const reference to the current clamping bounds.
@@ -1088,6 +1167,7 @@ namespace visage {
      * @return True if totally clamped, false otherwise.
      */
     bool totallyClamped() const { return state_.clamp.totallyClamped(); }
+
     /**
      * @brief Gets a color from the theme.
      * @param color_id The ID of the color to get.
@@ -1104,6 +1184,7 @@ namespace visage {
     Brush blendedColor(theme::ColorId color_from, theme::ColorId color_to, float t) {
       return color(color_from).interpolateWith(color(color_to), t);
     }
+
     /**
      * @brief Gets a value from the theme.
      * @param value_id The ID of the value to get.
@@ -1115,6 +1196,8 @@ namespace visage {
      * @return A vector of strings containing debug information.
      */
     std::vector<std::string> debugInfo() const;
+
+    PathAtlas* pathAtlas() { return &path_atlas_; }
     /**
      * @brief Gets the image atlas used by the canvas.
      * @return A pointer to the ImageAtlas.
@@ -1130,6 +1213,7 @@ namespace visage {
      * @return A pointer to the GradientAtlas.
      */
     GradientAtlas* gradientAtlas() { return &gradient_atlas_; }
+
     /**
      * @brief Gets the current state of the canvas.
      * @return A pointer to the State object.
@@ -1337,10 +1421,9 @@ namespace visage {
 
     void addSvg(const Svg& svg, float x, float y, float width, float height) {
       SvgDrawable::ColorContext context;
-      if (state_.brush) {
-        Brush current = state_.brush->originalBrush();
+      Brush current = state_.set_brush;
+      if (state_.brush)
         context.current_color = &current;
-      }
       svg.drawable()->drawAll(*this, &context, x, y, width, height);
     }
 
@@ -1359,6 +1442,11 @@ namespace visage {
                                 height, center, data, dataAtlas()));
     }
 
+    void addHeatMap(const HeatMapData& data, float x, float y, float width, float height) {
+      addShape(HeatMapWrapper(state_.clamp, state_.brush, state_.x + x, state_.y + y, width, height,
+                              data, dataAtlas()));
+    }
+
     Palette* palette_ = nullptr;
     float dpi_scale_ = 1.0f;
     double render_time_ = 0.0;
@@ -1370,6 +1458,7 @@ namespace visage {
     State state_;
 
     GradientAtlas gradient_atlas_;
+    PathAtlas path_atlas_;
     ImageAtlas image_atlas_;
     ImageAtlas data_atlas_;
 

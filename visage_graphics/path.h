@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include "visage_utils/clone_ptr.h"
+#include "graphics_utils.h"
 #include "visage_utils/space.h"
 
 #include <cfloat>
@@ -63,10 +63,10 @@ namespace visage {
   public:
     static constexpr float kDefaultErrorTolerance = 0.1f;
     static constexpr float kDefaultMiterLimit = 4.0f;
+    static constexpr float kPi = 3.14159265358979323846f;
 
     struct SubPath {
       std::vector<Point> points;
-      std::vector<float> values;
       bool closed = false;
     };
 
@@ -89,9 +89,9 @@ namespace visage {
         return adjustPoint({ x, y }, relative);
       }
 
-      void addCommand(Command command) {
+      void addCommand(const Command& command) {
         current = command.end;
-        push_back(std::move(command));
+        push_back(command);
       }
 
       void moveTo(float x, float y, bool relative = false) {
@@ -157,32 +157,32 @@ namespace visage {
           return check != Point(FLT_MAX, FLT_MAX) && check != current;
         };
 
-        index = std::clamp(index, 0, (int)size() - 1);
-        Point current = at(index).end;
-        Point prev_point = current;
-        for (int i = index; i >= 0 && prev_point == current; --i) {
+        index = std::clamp(index, 0, static_cast<int>(size()) - 1);
+        Point command = at(index).end;
+        Point prev_point = command;
+        for (int i = index; i >= 0 && prev_point == command; --i) {
           const auto& prev = at(i);
-          if (check_delta(current, prev.end))
+          if (check_delta(command, prev.end))
             prev_point = prev.end;
-          else if (check_delta(current, prev.control2))
+          else if (check_delta(command, prev.control2))
             prev_point = prev.control2;
-          else if (check_delta(current, prev.control1))
+          else if (check_delta(command, prev.control1))
             prev_point = prev.control1;
         }
 
-        Point next_point = current;
-        for (int i = index + 1; i < size() && next_point == current; ++i) {
+        Point next_point = command;
+        for (int i = index + 1; i < size() && next_point == command; ++i) {
           const auto& next = at(i);
-          if (check_delta(current, next.control1))
+          if (check_delta(command, next.control1))
             next_point = next.control1;
-          else if (check_delta(current, next.control2))
+          else if (check_delta(command, next.control2))
             next_point = next.control2;
-          else if (check_delta(current, next.end))
+          else if (check_delta(command, next.end))
             next_point = next.end;
         }
 
-        Point prev_direction = (current - prev_point).normalized();
-        Point next_direction = (next_point - current).normalized();
+        Point prev_direction = (command - prev_point).normalized();
+        Point next_direction = (next_point - command).normalized();
         Point direction = prev_direction + next_direction;
         if (direction == Point(0.0f, 0.0f))
           return { -prev_direction.y, prev_direction.x };
@@ -200,11 +200,10 @@ namespace visage {
       EvenOdd
     };
 
-    enum class Operation {
-      Union,
-      Intersection,
-      Difference,
-      Xor,
+    enum class ControlPoints {
+      Linear,
+      Quadratic,
+      Cubic
     };
 
     enum class Join {
@@ -237,18 +236,7 @@ namespace visage {
       return start1 + delta1 * t1;
     }
 
-    struct Triangulation {
-      std::vector<Point> points;
-      std::vector<uint16_t> triangles;
-    };
-
-    struct AntiAliasTriangulation : Triangulation {
-      std::vector<float> alphas;
-    };
-
     static CommandList parseSvgPath(const std::string& path);
-
-    void setPointValue(float value) { current_value_ = value; }
 
     void moveTo(Point point, bool relative = false) {
       if (!paths_.empty() && !paths_.back().points.empty())
@@ -258,7 +246,6 @@ namespace visage {
         point += last_point_;
 
       last_point_ = point;
-      smooth_control_point_ = {};
     }
 
     void moveTo(float x, float y, bool relative = false) { moveTo(Point(x, y), relative); }
@@ -271,7 +258,6 @@ namespace visage {
         point += last_point_;
 
       addPoint(point);
-      smooth_control_point_ = {};
     }
 
     void lineTo(float x, float y, bool relative = false) { lineTo(Point(x, y), relative); }
@@ -281,7 +267,6 @@ namespace visage {
         y += last_point_.y;
 
       lineTo(last_point_.x, y);
-      smooth_control_point_ = {};
     }
 
     void horizontalTo(float x, bool relative = false) {
@@ -289,7 +274,6 @@ namespace visage {
         x += last_point_.x;
 
       lineTo(x, last_point_.y);
-      smooth_control_point_ = {};
     }
 
     void close() {
@@ -322,6 +306,7 @@ namespace visage {
       Point control2 = end + (2.0f / 3.0f) * (control - end);
       smooth_control_point_ = end + (end - control);
       recurseBezierTo(from, control1, control2, end);
+      current_control_points_ = ControlPoints::Quadratic;
     }
 
     void quadraticTo(float control_x, float control_y, float end_x, float end_y, bool relative = false) {
@@ -329,6 +314,9 @@ namespace visage {
     }
 
     void smoothQuadraticTo(Point end, bool relative = false) {
+      if (current_control_points_ != ControlPoints::Quadratic)
+        smooth_control_point_ = last_point_;
+
       if (relative)
         end += last_point_;
 
@@ -352,6 +340,7 @@ namespace visage {
 
       recurseBezierTo(from, control1, control2, end);
       smooth_control_point_ = end + (end - control2);
+      current_control_points_ = ControlPoints::Cubic;
     }
 
     void bezierTo(float x1, float y1, float x2, float y2, float x3, float y3, bool relative = false) {
@@ -363,6 +352,8 @@ namespace visage {
         end_control += last_point_;
         end += last_point_;
       }
+      if (current_control_points_ != ControlPoints::Cubic)
+        smooth_control_point_ = end_control;
 
       bezierTo(smooth_control_point_, end_control, end);
     }
@@ -388,7 +379,6 @@ namespace visage {
     void clear() {
       paths_.clear();
       last_point_ = {};
-      triangulation_graph_.reset();
     }
 
     void loadSvgPath(const std::string& path);
@@ -405,14 +395,13 @@ namespace visage {
     void addEllipse(float cx, float cy, float rx, float ry);
     void addCircle(float cx, float cy, float r);
 
-    Triangulation triangulate();
-    Path combine(Path& other, Operation operation = Operation::Union);
-    AntiAliasTriangulation offsetAntiAlias(float scale);
-    Path offset(float offset, Join join = Join::Square, float miter_limit = kDefaultMiterLimit);
+    Path combine(Path& other, FillRule fill_rule = FillRule::EvenOdd) const;
+    SubPath singlePointOffset(Point point, float amount, EndCap end_cap);
+    Path offset(float amount, Join join = Join::Square, EndCap end_cap = EndCap::Butt,
+                float miter_limit = kDefaultMiterLimit);
     Path stroke(float stroke_width, Join join = Join::Round, EndCap end_cap = EndCap::Round,
                 std::vector<float> dash_array = {}, float dash_offset = 0.0f,
                 float miter_limit = kDefaultMiterLimit);
-    Path breakIntoSimplePolygons();
 
     Path scaled(float mult) const {
       Path result = *this;
@@ -483,10 +472,8 @@ namespace visage {
     }
 
     void reverse() {
-      for (auto& path : paths_) {
+      for (auto& path : paths_)
         std::reverse(path.points.begin(), path.points.end());
-        std::reverse(path.values.begin(), path.values.end());
-      }
     }
 
     void setFillRule(FillRule fill_rule) { fill_rule_ = fill_rule; }
@@ -532,348 +519,7 @@ namespace visage {
     const Matrix& resolutionMatrix() const { return resolution_matrix_; }
 
   private:
-    struct ScanLineArea {
-      ScanLineArea(int from_index, const DPoint& from, int to_index, const DPoint& to, bool forward) :
-          from_index(from_index), from(from), to_index(to_index), to(to), forward(forward) { }
-
-      bool operator==(const ScanLineArea& other) const {
-        return from_index == other.from_index && to_index == other.to_index && from == other.from &&
-               to == other.to;
-      }
-
-      bool operator<(const ScanLineArea& other) const {
-        double orientation = 0.0;
-        if (other.from < from)
-          orientation = stableOrientation(other.from, other.to, from);
-        else if (from < other.from)
-          orientation = -stableOrientation(from, to, other.from);
-
-        if (orientation)
-          return orientation < 0.0;
-
-        if (to == other.from && from != other.to)
-          return true;
-        if (from == other.to && to != other.from)
-          return false;
-
-        if (other.to < to)
-          return stableOrientation(other.from, other.to, to) < 0.0;
-        if (to < other.to)
-          return stableOrientation(from, to, other.to) > 0.0;
-
-        return false;
-      }
-
-      int from_index = 0;
-      DPoint from;
-      int to_index = 0;
-      DPoint to;
-      bool forward = true;
-      int data = 0;
-    };
-
-    class TriangulationGraph {
-    public:
-      static constexpr float kPi = 3.14159265358979323846f;
-
-      enum class PointType {
-        None,
-        Begin,
-        Continue,
-        End
-      };
-
-      struct IndexData {
-        int index;
-        DPoint point;
-        PointType type;
-
-        IndexData() : index(0), type(PointType::None) { }
-
-        IndexData(int i, const DPoint& p, PointType t) : index(i), point(p), type(t) { }
-
-        bool operator<(const IndexData& other) const {
-          if (type != other.type) {
-            if (type == PointType::None)
-              return false;
-            if (other.type == PointType::None)
-              return true;
-          }
-
-          double compare = point.compare(other.point);
-          if (compare)
-            return compare < 0.0;
-
-          if (type != other.type)
-            return type == PointType::End || other.type == PointType::Begin;
-
-          return index < other.index;
-        }
-      };
-
-      TriangulationGraph() = delete;
-      explicit TriangulationGraph(const Path* path);
-      TriangulationGraph(const TriangulationGraph& other) :
-          resolution_transform_(other.resolution_transform_),
-          intersections_broken_(other.intersections_broken_), points_(other.points_),
-          sorted_indices_(other.sorted_indices_), prev_edge_(other.prev_edge_),
-          next_edge_(other.next_edge_), scan_line_(std::make_unique<ScanLine>(*other.scan_line_)) {
-        scan_line_->setGraph(this);
-      }
-
-      Triangulation triangulate(FillRule fill_rule, int minimum_cycles = 1);
-
-      class ScanLine {
-      public:
-        enum class IntersectionType {
-          None,
-          Cross,
-          Colinear
-        };
-
-        struct Event {
-          Event(PointType type, int index, const DPoint& point, int prev_index, const DPoint& prev,
-                int next_index, const DPoint& next, bool degeneracy) :
-              type(type), index(index), point(point), prev_index(prev_index), prev(prev),
-              next_index(next_index), next(next), degeneracy(degeneracy) { }
-
-          PointType type;
-          int index;
-          DPoint point;
-          int prev_index;
-          DPoint prev;
-          int next_index;
-          DPoint next;
-          bool degeneracy;
-        };
-
-        struct IntersectionEvent {
-          DPoint point;
-          int area1_from_index;
-          int area1_to_index;
-          int area2_from_index;
-          int area2_to_index;
-        };
-
-        ScanLine() = delete;
-        explicit ScanLine(TriangulationGraph* graph) { setGraph(graph); }
-
-        void setGraph(TriangulationGraph* graph) { graph_ = graph; }
-
-        bool hasNext() const { return current_index_ < sorted_indices_->size(); }
-        void progressToNextEvent() {
-          while (current_index_ < sorted_indices_->size()) {
-            int index = sorted_indices_->at(current_index_).index;
-            if (graph_->next_edge_[index] != index)
-              break;
-            current_index_++;
-          }
-        }
-
-        int resolveAlias(int index) const {
-          if (aliases_.count(index))
-            return aliases_.at(index);
-          return index;
-        }
-
-        void addAlias(int alias, int original) {
-          while (aliases_.count(original))
-            original = aliases_[original];
-
-          aliases_[alias] = original;
-        }
-
-        Event nextEvent() const {
-          auto current = sorted_indices_->at(current_index_);
-          int prev_index = resolveAlias(graph_->prev_edge_[current.index]);
-          int next_index = resolveAlias(graph_->next_edge_[current.index]);
-          auto prev = graph_->points_[prev_index];
-          auto next = graph_->points_[next_index];
-          bool degeneracy = current_index_ + 1 < sorted_indices_->size() &&
-                            sorted_indices_->at(current_index_ + 1).point == current.point;
-          degeneracy = degeneracy || (current_index_ - 1 >= 0 &&
-                                      sorted_indices_->at(current_index_ - 1).point == current.point);
-          return { current.type, current.index, current.point, prev_index,
-                   prev,         next_index,    next,          degeneracy };
-        }
-
-        void progressToNextIntersection() {
-          next_intersection_ = -1;
-          DPoint point;
-          for (int i = 0; i < intersection_events_.size(); ++i) {
-            if (next_intersection_ == -1 || intersection_events_[i].point < point) {
-              next_intersection_ = i;
-              point = intersection_events_[i].point;
-            }
-          }
-        }
-
-        auto findAreaByToIndex(int index, std::vector<ScanLineArea>::iterator it) {
-          for (; it != areas_.end(); ++it) {
-            if (it->to_index == index)
-              return it;
-          }
-
-          VISAGE_ASSERT(false);
-          return areas_.end();
-        }
-
-        auto findAreaByFromTo(int from, int to) {
-          for (auto it = areas_.begin(); it != areas_.end(); ++it) {
-            if (it->from_index == from && it->to_index == to)
-              return it;
-          }
-
-          VISAGE_ASSERT(false);
-          return areas_.end();
-        }
-
-        auto findAreaByToIndex(int index) { return findAreaByToIndex(index, areas_.begin()); }
-        auto safePrev(const std::vector<ScanLineArea>::iterator& it);
-        auto safePrev(const std::vector<ScanLineArea>::const_iterator& it) const;
-        bool splitIntersection();
-
-        IntersectionType intersectionType(std::vector<ScanLineArea>::iterator it);
-
-        bool hasIntersection(int from1, int to1, int from2, int to2) const {
-          return std::any_of(intersection_events_.begin(), intersection_events_.end(), [&](const auto& intersection) {
-            return (intersection.area1_from_index == from1 && intersection.area1_to_index == to1 &&
-                    intersection.area2_from_index == from2 && intersection.area2_to_index == to2) ||
-                   (intersection.area1_from_index == from2 && intersection.area1_to_index == to2 &&
-                    intersection.area2_from_index == from1 && intersection.area2_to_index == to1);
-          });
-        }
-
-        void checkAddIntersection(const std::vector<ScanLineArea>::iterator& it);
-        void checkRemoveIntersection(const std::vector<ScanLineArea>::iterator& it);
-        void processPointEvents(Event ev);
-
-        template<typename HandlePair>
-        void pairInsOuts(std::vector<ScanLineArea>& areas, HandlePair handle_pair) {
-          std::sort(areas.begin(), areas.end());
-
-          auto pair = [&](std::vector<ScanLineArea>::iterator& it) {
-            auto next = std::next(it);
-            int index = it - areas.begin();
-            handle_pair(*it, *next, index);
-
-            it = areas.erase(it);
-            it = areas.erase(it);
-            if (it != areas.begin() && it != areas.end())
-              it = std::prev(it);
-          };
-
-          for (auto it = areas.begin(); it != areas.end();) {
-            auto next = std::next(it);
-            if (next != areas.end() && it->forward != next->forward && it->from == next->from &&
-                it->to == next->to) {
-              pair(it);
-            }
-            else
-              ++it;
-          }
-
-          for (auto it = areas.begin(); it != areas.end();) {
-            auto next = std::next(it);
-            if (next != areas.end() && it->forward != next->forward)
-              pair(it);
-            else
-              ++it;
-          }
-        }
-
-        void updateNormalEvent(const Event& ev);
-        void updateDegeneracy(const Event& ev);
-        bool updateSplitIntersections();
-        void updateBreakIntersections();
-
-        void update() { updateNormalEvent(nextEvent()); }
-        auto begin() { return areas_.begin(); }
-
-        auto lowerBound(const ScanLineArea& area) {
-          return std::lower_bound(areas_.begin(), areas_.end(), area);
-        }
-
-        int editPosition(int index) const {
-          VISAGE_ASSERT(index < edit_positions_.size() && edit_positions_[index] >= 0);
-          return edit_positions_[index];
-        }
-
-        auto end() const { return areas_.end(); }
-        int lastData() const { return last_data_; }
-        auto lastPosition1() const { return last_position1_; }
-        auto lastPosition2() const { return last_position2_; }
-
-        void reset() {
-          sorted_indices_ = graph_->sortedIndices();
-          edit_positions_.resize(sorted_indices_->size(), -1);
-          areas_.clear();
-          last_position1_ = areas_.end();
-          last_position2_ = areas_.end();
-          aliases_.clear();
-          intersection_events_.clear();
-          current_index_ = 0;
-          progressToNextEvent();
-        }
-
-      private:
-        TriangulationGraph* graph_ = nullptr;
-        const std::vector<IndexData>* sorted_indices_ = nullptr;
-        int current_index_ = 0;
-        int next_intersection_ = -1;
-
-        std::vector<ScanLineArea> areas_;
-        std::vector<int> edit_positions_;
-        std::vector<ScanLineArea>::iterator last_position1_ = areas_.end();
-        std::vector<ScanLineArea>::iterator last_position2_ = areas_.end();
-        std::map<int, int> aliases_;
-        std::vector<ScanLineArea> new_areas_;
-        std::vector<ScanLineArea> old_areas_;
-        std::vector<ScanLineArea> next_areas_;
-        std::vector<int> degeneracies_;
-
-        std::vector<IntersectionEvent> intersection_events_;
-        int last_data_ = 0;
-      };
-
-      void breakIntersections();
-      void fixWindings(FillRule fill_rule, int minimum_cycles = 1);
-      void reverse();
-
-      void breakSimpleIntoMonotonicPolygons();
-      std::vector<uint16_t> breakIntoTriangles();
-      void singlePointOffset(double amount, int index, EndCap end_cap);
-      void offset(double amount, Join join, EndCap end_cap, float miter_limit = kDefaultMiterLimit);
-
-      void combine(const TriangulationGraph& other);
-      void removeLinearPoints();
-      void simplify();
-      Path toPath() const;
-
-    private:
-      PointType pointType(int index) const;
-      int addAdditionalPoint(const DPoint& point);
-      int insertPointBetween(int start_index, int end_index, const DPoint& point);
-      bool connected(int a_index, int b_index) const;
-      void connect(int from, int to);
-      void removeFromCycle(int index);
-      bool checkValidPolygons() const;
-      const std::vector<IndexData>* sortedIndices();
-      void removeCycle(int start_index);
-      void reverseCycle(int start_index);
-      int addDiagonal(int index, int target);
-      bool tryCutEar(int index, bool forward, std::vector<uint16_t>& triangles,
-                     const std::unique_ptr<bool[]>& touched);
-      void cutEars(int index, std::vector<uint16_t>& triangles, const std::unique_ptr<bool[]>& touched);
-
-      Transform resolution_transform_;
-      bool intersections_broken_ = false;
-      std::vector<DPoint> points_;
-      std::vector<IndexData> sorted_indices_;
-      std::vector<int> prev_edge_;
-      std::vector<int> next_edge_;
-      std::unique_ptr<ScanLine> scan_line_;
-    };
+    Path offset(float amount, Join join, Join inner_join, EndCap end_cap, float miter_limit);
 
     static Point deltaFromLine(const Point& point, const Point& line_from, const Point& line_to) {
       if (line_from == line_to)
@@ -910,14 +556,11 @@ namespace visage {
       recurseBezierTo(break_point, midmid2, mid3, to);
     }
 
-    Path combine(Path& other, FillRule fill_rule, int num_cycles_needed, bool reverse_other);
-
     void startNewPath() {
       if (paths_.empty() || !paths_.back().points.empty())
         paths_.emplace_back();
 
-      smooth_control_point_ = {};
-      current_value_ = 0.0f;
+      current_control_points_ = ControlPoints::Linear;
     }
 
     SubPath& currentPath() {
@@ -930,27 +573,163 @@ namespace visage {
       if (!currentPath().points.empty() && point == currentPath().points.back())
         return;
 
-      triangulation_graph_.reset();
       last_point_ = point;
       currentPath().points.push_back(point);
-      currentPath().values.push_back(current_value_);
-    }
-
-    TriangulationGraph* triangulationGraph() {
-      if (!triangulation_graph_)
-        triangulation_graph_ = std::make_unique<TriangulationGraph>(this);
-      return triangulation_graph_.get();
+      current_control_points_ = ControlPoints::Linear;
     }
 
     void addPoint(float x, float y) { addPoint({ x, y }); }
 
     Matrix resolution_matrix_;
     std::vector<SubPath> paths_;
-    clone_ptr<TriangulationGraph> triangulation_graph_;
     FillRule fill_rule_ = FillRule::EvenOdd;
     Point smooth_control_point_;
+    ControlPoints current_control_points_ = ControlPoints::Linear;
     Point last_point_;
-    float current_value_ = 0.0f;
     float error_tolerance_ = kDefaultErrorTolerance;
+  };
+
+  struct PathAtlasTexture;
+
+  class PathAtlas {
+  public:
+    static constexpr int kBuffer = 1;
+
+    struct PackedPathRect {
+      explicit PackedPathRect(const Path& p) : path(p) { }
+
+      Path path;
+      int x = 0;
+      int y = 0;
+      int w = 0;
+      int h = 0;
+      bool needs_update = true;
+    };
+
+    struct PackedPathReference {
+      PackedPathReference(std::weak_ptr<PathAtlas*> atlas, const PackedPathRect* packed_path_rect) :
+          atlas(std::move(atlas)), packed_path_rect(packed_path_rect) { }
+      ~PackedPathReference();
+
+      std::weak_ptr<PathAtlas*> atlas;
+      const PackedPathRect* packed_path_rect = nullptr;
+    };
+
+    class PackedPath {
+    public:
+      explicit PackedPath(std::shared_ptr<PackedPathReference> reference) :
+          reference_(std::move(reference)) { }
+
+      PackedPath() = default;
+      ~PackedPath() = default;
+
+      int x() const {
+        VISAGE_ASSERT(reference_->atlas.lock().get());
+        return reference_->packed_path_rect->x;
+      }
+
+      int y() const {
+        VISAGE_ASSERT(reference_->atlas.lock().get());
+        return reference_->packed_path_rect->y;
+      }
+
+      int w() const {
+        VISAGE_ASSERT(reference_->atlas.lock().get());
+        return reference_->packed_path_rect->w;
+      }
+
+      int h() const {
+        VISAGE_ASSERT(reference_->atlas.lock().get());
+        return reference_->packed_path_rect->h;
+      }
+
+      const Path& path() const {
+        VISAGE_ASSERT(reference_->atlas.lock().get());
+        return reference_->packed_path_rect->path;
+      }
+
+      const PackedPathRect* packedImageRect() const {
+        VISAGE_ASSERT(reference_->atlas.lock().get());
+        return reference_->packed_path_rect;
+      }
+
+    private:
+      std::shared_ptr<PackedPathReference> reference_;
+    };
+
+    PathAtlas();
+    ~PathAtlas();
+
+    PackedPath addPath(const Path& path, int width, int height) {
+      std::unique_ptr<PackedPathRect> packed_path_rect = std::make_unique<PackedPathRect>(path);
+      if (!atlas_map_.addRect(packed_path_rect.get(), width, height))
+        needs_packing_ = true;
+
+      const PackedRect& rect = atlas_map_.rectForId(packed_path_rect.get());
+      packed_path_rect->x = rect.x;
+      packed_path_rect->y = rect.y;
+      packed_path_rect->w = rect.w;
+      packed_path_rect->h = rect.h;
+      auto packed_rect = packed_path_rect.get();
+      paths_.push_back(std::move(packed_path_rect));
+
+      auto reference = std::make_shared<PackedPathReference>(reference_, packed_rect);
+      references_[packed_rect] = reference;
+      return PackedPath(reference);
+    }
+
+    int updatePaths(int submit_pass);
+    void destroy();
+    int width() const { return width_; }
+    int height() const { return height_; }
+
+    const bgfx::FrameBufferHandle& frameBufferHandle();
+
+    void removePath(const PackedPathRect* packed_path_rect) {
+      atlas_map_.removeRect(packed_path_rect);
+      references_.erase(packed_path_rect);
+      paths_.erase(std::remove_if(paths_.begin(), paths_.end(),
+                                  [&](const std::unique_ptr<PackedPathRect>& ptr) {
+                                    return ptr.get() == packed_path_rect;
+                                  }),
+                   paths_.end());
+    }
+
+    static void setPathAtlasCoordinates(TextureVertex* vertices, const PackedPath& rect) {
+      float left = rect.x();
+      float top = rect.y();
+      float right = left + rect.w();
+      float bottom = top + rect.h();
+
+      vertices[0].texture_x = left;
+      vertices[0].texture_y = top;
+      vertices[1].texture_x = right;
+      vertices[1].texture_y = top;
+      vertices[2].texture_x = left;
+      vertices[2].texture_y = bottom;
+      vertices[3].texture_x = right;
+      vertices[3].texture_y = bottom;
+
+      for (int i = 0; i < kVerticesPerQuad; ++i) {
+        vertices[i].direction_x = 1.0f;
+        vertices[i].direction_y = 0.0f;
+      }
+    }
+
+  private:
+    bool clearUpdatedPathAreas(int submit_pass);
+    void checkInit();
+    void resize();
+
+    std::map<const PackedPathRect*, std::weak_ptr<PackedPathReference>> references_;
+    std::vector<std::unique_ptr<PackedPathRect>> paths_;
+    PackedAtlasMap<const PackedPathRect*> atlas_map_;
+    std::unique_ptr<PathAtlasTexture> frame_buffer_;
+    int width_ = 0;
+    int height_ = 0;
+    bool needs_packing_ = false;
+    std::shared_ptr<PathAtlas*> reference_;
+
+    VISAGE_LEAK_CHECKER(PathAtlas)
   };
 }

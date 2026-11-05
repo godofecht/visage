@@ -164,6 +164,11 @@ namespace visage {
 
   template<typename VertexType = ShapeVertex>
   struct Primitive : Shape<VertexType> {
+    static void* taggedPointer(void* pointer, int tag) {
+      uintptr_t int_value = reinterpret_cast<uintptr_t>(pointer);
+      return reinterpret_cast<void*>(int_value | uintptr_t(tag) & 3);
+    }
+
     Primitive(const void* batch_id, const ClampBounds& clamp, const PackedBrush* brush, float x,
               float y, float width, float height) :
         Shape<VertexType>(batch_id, clamp, brush, x, y, width, height) { }
@@ -496,11 +501,6 @@ namespace visage {
     static const EmbeddedFile& vertexShader();
     static const EmbeddedFile& fragmentShader();
 
-    static void* taggedPointer(void* pointer, int tag) {
-      uintptr_t int_value = reinterpret_cast<uintptr_t>(pointer);
-      return reinterpret_cast<void*>(int_value | uintptr_t(tag) & 3);
-    }
-
     GraphFillWrapper(const ClampBounds& clamp, const PackedBrush* brush, float x, float y, float width,
                      float height, float center, const GraphData& graph_data, ImageAtlas* data_atlas) :
         Primitive(taggedPointer(data_atlas, 1), clamp, brush, x, y, width, height),
@@ -523,27 +523,77 @@ namespace visage {
     ImageAtlas::PackedImage packed_data;
   };
 
-  struct PathFillWrapper : Shape<> {
+  struct HeatMapWrapper : Primitive<> {
+    static const EmbeddedFile& vertexShader();
+    static const EmbeddedFile& fragmentShader();
+
+    HeatMapWrapper(const ClampBounds& clamp, const PackedBrush* brush, float x, float y, float width,
+                   float height, const HeatMapData& heat_map_data, ImageAtlas* data_atlas) :
+        Primitive(taggedPointer(data_atlas, 2), clamp, brush, x, y, width, height),
+        data_atlas(data_atlas), data(heat_map_data),
+        packed_data(data_atlas->addData(data.data(), data.width(), data.height())) {
+      thickness = heat_map_data.height();
+      pixel_width = heat_map_data.octaves();
+    }
+
+    void setVertexData(Vertex* vertices) const {
+      setPrimitiveData(vertices);
+
+      vertices[0].value1 = packed_data.x();
+      vertices[0].value2 = packed_data.y();
+
+      vertices[1].value1 = packed_data.x() + packed_data.w();
+      vertices[1].value2 = packed_data.y();
+
+      vertices[2].value1 = packed_data.x();
+      vertices[2].value2 = packed_data.y();
+
+      vertices[3].value1 = packed_data.x() + packed_data.w();
+      vertices[3].value2 = packed_data.y();
+    }
+
+    ImageAtlas* data_atlas = nullptr;
+    HeatMapData data;
+    ImageAtlas::PackedImage packed_data;
+  };
+
+  struct PathFillWrapper : Shape<TextureVertex> {
     VISAGE_CREATE_BATCH_ID
     static constexpr int kLineVerticesPerPoint = 6;
+    static constexpr float kBuffer = 1.0f;
     static const EmbeddedFile& vertexShader();
     static const EmbeddedFile& fragmentShader();
 
     PathFillWrapper(const ClampBounds& clamp, const PackedBrush* brush, float x, float y,
-                    float width, float height, const Path& original, float scale) :
-        Shape(batchId(), clamp, brush, x, y, width, height), scale(scale) {
-      Path border;
-      border.addRectangle(0, 0, width / scale, height / scale);
-      path = original;
-      path = path.combine(border, Path::Operation::Intersection);
-      triangulation = path.offset(-0.5f / scale, Path::Join::Miter).offsetAntiAlias(scale);
+                    float width, float height, const Path& path, PathAtlas* atlas, float scale) :
+        Shape(batchId(), clamp, brush, x, y, width, height), path_atlas(atlas), scale(scale) {
+      Path adjusted_path = scale == 1.0f ? path : path.scaled(scale);
+      Bounds bounding_box = adjusted_path.boundingBox();
+      float new_x = static_cast<int>(x + bounding_box.x() - kBuffer);
+      float new_y = static_cast<int>(y + bounding_box.y() - kBuffer);
+      float new_width = std::ceil(x + bounding_box.right() + kBuffer) - new_x;
+      float new_height = std::ceil(y + bounding_box.bottom() + kBuffer) - new_y;
+
+      float shift_x = new_x - x;
+      float shift_y = new_y - y;
+      this->x = new_x;
+      this->y = new_y;
+      this->width = new_width;
+      this->height = new_height;
+      adjusted_path = adjusted_path.translated(-shift_x, -shift_y);
+      packed_path = atlas->addPath(std::move(adjusted_path), new_width, new_height);
     }
 
-    Path path;
-    float scale = 1.0f;
-    Path::AntiAliasTriangulation triangulation;
+    void setVertexData(Vertex* vertices) const {
+      path_atlas->setPathAtlasCoordinates(vertices, packed_path);
+      float even_odd = packed_path.path().fillRule() == Path::FillRule::EvenOdd ? 1.0f : 0.0f;
+      for (int i = 0; i < kVerticesPerQuad; ++i)
+        vertices[i].direction_x = even_odd;
+    }
 
-    int numVertices() const { return triangulation.points.size(); }
+    PathAtlas* path_atlas = nullptr;
+    float scale = 1.0f;
+    PathAtlas::PackedPath packed_path;
   };
 
   template<typename T>

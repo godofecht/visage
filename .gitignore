@@ -35,6 +35,8 @@ Debug
 Profile
 Release
 CLAUDE.md
+AGENTS.md
+.claude
 cmake_build
 CMakeLists.txt.user
 CMakeCache.txt
