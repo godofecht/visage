@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
+#include <vector>
 
 namespace visage {
   static constexpr int kUnprintableKeycodeMask = 1 << 30;
