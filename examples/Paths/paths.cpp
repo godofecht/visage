@@ -28,6 +28,7 @@
 // This function creates a Path object representing a five-pointed star.
 visage::Path starPath(float center_x, float center_y, float radius) {
   static constexpr float kPi = 3.14159265f;
+
   visage::Path path;
   int num_points = 10; // 5 inner points and 5 outer points
 
@@ -75,11 +76,11 @@ int runExample() {
     auto stroked = star.stroke(2); // The argument is the stroke width.
 
     // 2. A dashed path: This also creates a stroked path, but with a dash pattern.
-    float segment = star.length() / 20.0f;
+    float segment = star.length() / 40.0f;
     // The `stroke` method has optional arguments for join style, end cap style, a dash pattern,
     // and a dash offset. Here, we create a simple dash pattern and animate the offset over time.
-    auto dashed = star.stroke(2, visage::Path::Join::Miter, visage::Path::EndCap::Butt, { segment },
-                              canvas.time() * segment);
+    auto dashed = star.stroke(2, visage::Path::Join::Round, visage::Path::EndCap::Round,
+                              { segment }, canvas.time() * segment);
 
     // --- Drawing ---
 

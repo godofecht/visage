@@ -26,6 +26,7 @@
 #include "visage_utils/space.h"
 
 #include <functional>
+#include <mutex>
 #include <string>
 
 namespace visage {
@@ -117,6 +118,7 @@ namespace visage {
 
     std::vector<EventTimer*> timers_ {};
     std::vector<std::function<void()>> callbacks_ {};
+    std::mutex callback_mutex_;
   };
 
   static void runOnEventThread(std::function<void()> function) {

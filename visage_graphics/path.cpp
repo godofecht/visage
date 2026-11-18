@@ -21,16 +21,21 @@
 
 #include "path.h"
 
+#include "embedded/shaders.h"
+#include "graphics_caches.h"
+#include "shape_batcher.h"
+#include "uniforms.h"
+
+#include <bgfx/bgfx.h>
 #include <complex>
 #include <memory>
-#include <set>
 
 namespace visage {
   static float toFloat(const std::string& str) {
     try {
       return std::stof(str);
     }
-    catch (const std::exception&) {
+    catch (...) {
       return 0.0f;
     }
   }
@@ -109,8 +114,6 @@ namespace visage {
     if (currentPath().points.empty())
       addPoint(last_point_);
 
-    smooth_control_point_ = {};
-
     Point from = last_point_;
     if (relative)
       point += last_point_;
@@ -134,7 +137,7 @@ namespace visage {
     float arc_angle = 2.0f * std::asin(length * 0.5f / radius);
 
     if (large_arc)
-      arc_angle = 2.0f * TriangulationGraph::kPi - arc_angle;
+      arc_angle = 2.0f * kPi - arc_angle;
     if (!sweep_flag)
       arc_angle = -arc_angle;
 
@@ -143,9 +146,9 @@ namespace visage {
     float max_delta_radians = 2.0f * clampedACos(1.0f - error_tolerance_ / max_radius);
     int num_points = std::ceil(std::abs(arc_angle) / max_delta_radians);
 
-    std::complex<double> position(-center.x, -center.y);
-    double angle_delta = arc_angle / num_points;
-    std::complex<double> rotation = std::polar(1.0, angle_delta);
+    std::complex<float> position(-center.x, -center.y);
+    float angle_delta = arc_angle / num_points;
+    std::complex<float> rotation = std::polar(1.0f, angle_delta);
 
     for (int i = 0; i < num_points; ++i) {
       position *= rotation;
@@ -212,6 +215,17 @@ namespace visage {
         float x = parseNumber(path, i);
         float y = parseNumber(path, i);
         commands.moveTo(x, y, relative);
+
+        if (std::isspace(path[i])) {
+          ++i;
+          continue;
+        }
+
+        if (i < path.size() && !std::isalpha(path[i])) {
+          x = parseNumber(path, i);
+          y = parseNumber(path, i);
+          commands.lineTo(x, y, relative);
+        }
       }
       else if (type == 'L') {
         float x = parseNumber(path, i);
@@ -358,719 +372,80 @@ namespace visage {
     }
   }
 
-  Path::TriangulationGraph::TriangulationGraph(const Path* path) {
-    int num_points = path->numPoints();
-    resolution_transform_ = path->resolutionMatrix();
-    prev_edge_.reserve(num_points);
-    next_edge_.reserve(num_points);
-
-    points_.reserve(num_points);
-    int path_start = 0;
-    for (const auto& sub_path : path->subPaths()) {
-      int sub_path_size = sub_path.points.size();
-      if (sub_path_size == 0)
-        continue;
-
-      for (int i = 0; i < sub_path_size; ++i) {
-        points_.emplace_back(sub_path.points[i]);
-        prev_edge_.push_back(path_start + (i - 1 + sub_path_size) % sub_path_size);
-        next_edge_.push_back(path_start + (i + 1) % sub_path_size);
-      }
-
-      path_start += sub_path_size;
-      VISAGE_ASSERT(next_edge_.size() == points_.size());
-    }
-
-    scan_line_ = std::make_unique<ScanLine>(this);
-    simplify();
+  Path Path::combine(Path& other, FillRule fill_rule) const {
+    Path combined = *this;
+    for (auto& path : other.paths_)
+      combined.paths_.push_back(path);
+    combined.fill_rule_ = fill_rule;
+    return combined;
   }
 
-  Path::Triangulation Path::TriangulationGraph::triangulate(FillRule fill_rule, int minimum_cycles) {
-    removeLinearPoints();
-    breakIntersections();
-    fixWindings(fill_rule, minimum_cycles);
-    breakSimpleIntoMonotonicPolygons();
-    Triangulation result;
-    result.triangles = breakIntoTriangles();
-    for (const auto& point : points_)
-      result.points.emplace_back(point);
-    return result;
-  }
-
-  auto Path::TriangulationGraph::ScanLine::safePrev(const std::vector<ScanLineArea>::iterator& it) {
-    if (it != areas_.begin())
-      return std::prev(it);
-    return areas_.end();
-  }
-
-  auto Path::TriangulationGraph::ScanLine::safePrev(const std::vector<ScanLineArea>::const_iterator& it) const {
-    if (it != areas_.begin())
-      return std::prev(it);
-    return areas_.end();
-  }
-
-  bool Path::TriangulationGraph::ScanLine::splitIntersection() {
-    auto it = intersection_events_.begin() + next_intersection_;
-    IntersectionEvent ev = *it;
-    intersection_events_.erase(it);
-    last_position1_ = findAreaByFromTo(ev.area1_from_index, ev.area1_to_index);
-    last_position2_ = findAreaByFromTo(ev.area2_from_index, ev.area2_to_index);
-    checkRemoveIntersection(safePrev(last_position1_));
-    checkRemoveIntersection(last_position2_);
-
-    bool added = false;
-
-    if (ev.point != last_position1_->from && ev.point != last_position1_->to) {
-      last_position1_->from_index = graph_->insertPointBetween(last_position1_->from_index,
-                                                               last_position1_->to_index, ev.point);
-      last_position1_->from = ev.point;
-      added = true;
-    }
-    if (ev.point != last_position2_->from && ev.point != last_position2_->to) {
-      last_position2_->from_index = graph_->insertPointBetween(last_position2_->from_index,
-                                                               last_position2_->to_index, ev.point);
-      last_position2_->from = ev.point;
-      added = true;
-    }
-
-    progressToNextIntersection();
-    if (*last_position2_ < *last_position1_)
-      std::swap(*last_position1_, *last_position2_);
-
-    checkAddIntersection(safePrev(last_position1_));
-    checkAddIntersection(last_position1_);
-    checkAddIntersection(last_position2_);
-
-    return added;
-  }
-
-  Path::TriangulationGraph::ScanLine::IntersectionType Path::TriangulationGraph::ScanLine::
-      intersectionType(std::vector<ScanLineArea>::iterator it) {
-    if (it == areas_.end())
-      return IntersectionType::None;
-    auto next = std::next(it);
-    if (next == areas_.end())
-      return IntersectionType::None;
-
-    if (it->from.y < next->from.y && it->to.y < next->from.y && it->from.y < next->to.y &&
-        it->to.y < next->to.y)
-      return IntersectionType::None;
-
-    if (it->from == next->to || next->from == it->to || it->to_index == next->to_index)
-      return IntersectionType::None;
-
-    const auto& area1 = *it;
-    const auto& area2 = *next;
-
-    double cross = (area1.to - area1.from).cross(area2.to - area2.from);
-    double compare1 = stableOrientation(area1.from, area1.to, area2.to);
-    double compare2 = stableOrientation(area2.from, area2.to, area1.to);
-    if (compare1 == 0.0 && compare2 == 0.0) {
-      if (it->from == next->from && it->to == next->to)
-        return IntersectionType::None;
-
-      if (cross == 0.0 || stableOrientation(area1.from, area1.to, area2.from) == 0.0)
-        return IntersectionType::Colinear;
-
-      if (it->to == next->to)
-        return IntersectionType::None;
-
-      return IntersectionType::Cross;
-    }
-
-    if (compare1 <= 0.0 && compare2 >= 0.0)
-      return cross == 0.0 ? IntersectionType::Colinear : IntersectionType::Cross;
-
-    if (area1.from == area2.from)
-      return IntersectionType::None;
-
-    compare1 = stableOrientation(area1.from, area1.to, area2.from);
-    double min_y = std::min(area1.from.y, area1.to.y);
-    double max_y = std::max(area1.from.y, area1.to.y);
-    if (compare1 == 0.0 && area2.from.x >= area1.from.x && area2.from.x <= area1.to.x &&
-        area2.from.y >= min_y && area2.from.y <= max_y)
-      return IntersectionType::Cross;
-
-    compare2 = stableOrientation(area2.from, area2.to, area1.from);
-    min_y = std::min(area2.from.y, area2.to.y);
-    max_y = std::max(area2.from.y, area2.to.y);
-    if (compare2 == 0.0 && area1.from.x >= area2.from.x && area1.from.x <= area2.to.x &&
-        area1.from.y >= min_y && area1.from.y <= max_y)
-      return IntersectionType::Cross;
-
-    return IntersectionType::None;
-  }
-
-  void Path::TriangulationGraph::ScanLine::checkAddIntersection(const std::vector<ScanLineArea>::iterator& it) {
-    double kEpsilon = 1.0e-8;
-
-    auto intersection_type = intersectionType(it);
-    if (intersection_type == IntersectionType::None)
-      return;
-
-    DPoint intersection;
-    auto next = std::next(it);
-
-    if (intersection_type == IntersectionType::Colinear) {
-      if (it->from != next->from)
-        intersection = it->from < next->from ? next->from : it->from;
-      else
-        intersection = it->to < next->to ? it->to : next->to;
-    }
-    else {
-      auto intersection_option = findIntersection(it->from, it->to, next->from, next->to);
-      VISAGE_ASSERT(intersection_option.has_value());
-      intersection = intersection_option.value();
-
-      if ((intersection - it->from).squareMagnitude() < kEpsilon)
-        intersection = it->from;
-      else if ((intersection - it->to).squareMagnitude() < kEpsilon)
-        intersection = it->to;
-      else if ((intersection - next->from).squareMagnitude() < kEpsilon)
-        intersection = next->from;
-      else if ((intersection - next->to).squareMagnitude() < kEpsilon)
-        intersection = next->to;
-
-      double min_x = std::max(it->from.x, next->from.x);
-      double max_x = std::min(it->to.x, next->to.x);
-      intersection.x = std::clamp(intersection.x, min_x, max_x);
-      double min_y = std::max(std::min(it->from.y, it->to.y), std::min(next->from.y, next->to.y));
-      double max_y = std::min(std::max(it->from.y, it->to.y), std::max(next->from.y, next->to.y));
-      max_y = std::max(min_y, max_y);
-      intersection.y = std::clamp(intersection.y, min_y, max_y);
-    }
-
-    // TODO: this can possibly move the intersection point a lot if points are set with double precision
-    // e.g. intersecting (0.0, 0.0) -> (std::nextafter(0.0), 2.0) and (-1.0, 0.0) -> (1.0, 0.0)
-    // This doesn't happen when defining the path with floats since you get more space
-    // between x positions when converting to double.
-    intersection = std::clamp(intersection, it->from, it->to);
-    intersection = std::clamp(intersection, next->from, next->to);
-
-    if (next_intersection_ >= 0 && intersection < intersection_events_[next_intersection_].point)
-      next_intersection_ = intersection_events_.size();
-    else if (next_intersection_ < 0)
-      next_intersection_ = 0;
-
-    VISAGE_ASSERT(!hasIntersection(it->from_index, it->to_index, next->from_index, next->to_index));
-    intersection_events_.push_back(IntersectionEvent { intersection, it->from_index, it->to_index,
-                                                       next->from_index, next->to_index });
-  }
-
-  void Path::TriangulationGraph::ScanLine::checkRemoveIntersection(const std::vector<ScanLineArea>::iterator& it) {
-    if (intersectionType(it) == IntersectionType::None)
-      return;
-
-    for (int i = 0; i < intersection_events_.size(); ++i) {
-      const auto& ev = intersection_events_[i];
-      if (ev.area1_to_index == it->to_index && ev.area1_from_index == it->from_index &&
-          ev.area2_to_index == std::next(it)->to_index) {
-        intersection_events_.erase(intersection_events_.begin() + i);
-        if (next_intersection_ == i)
-          progressToNextIntersection();
-        else if (next_intersection_ > i)
-          next_intersection_--;
-        return;
-      }
-    }
-    VISAGE_ASSERT(false);
-  }
-
-  void Path::TriangulationGraph::ScanLine::processPointEvents(Event ev) {
-    bool found_position = false;
-    for (auto it = areas_.begin(); it != areas_.end();) {
-      if (it->to == ev.point) {
-        old_areas_.push_back(*it);
-        found_position = true;
-        it = areas_.erase(it);
-        last_position1_ = it;
-      }
-      else
-        ++it;
-    }
-
-    DPoint point = ev.point;
-    while (ev.degeneracy && ev.point == point) {
-      if (ev.type == PointType::Continue) {
-        int from_index = ev.prev_index;
-        int to_index = ev.next_index;
-        bool forward = ev.prev < ev.next;
-        if (!forward)
-          std::swap(from_index, to_index);
-
-        new_areas_.emplace_back(ev.index, point, to_index, graph_->points_[to_index], forward);
-      }
-      else if (ev.type == PointType::Begin) {
-        new_areas_.emplace_back(ev.index, point, ev.prev_index, ev.prev, false);
-        new_areas_.emplace_back(ev.index, point, ev.next_index, ev.next, true);
-        if (!found_position) {
-          found_position = true;
-          last_position1_ = areas_.begin() + editPosition(ev.index);
-        }
-      }
-
-      current_index_++;
-      progressToNextEvent();
-      if (!hasNext())
-        break;
-
-      ev = nextEvent();
-    }
-  }
-
-  void Path::TriangulationGraph::ScanLine::updateNormalEvent(const Event& ev) {
-    if (ev.type == PointType::Continue) {
-      last_position1_ = findAreaByToIndex(ev.index);
-      last_position2_ = last_position1_;
-      last_data_ = last_position1_->data;
-
-      bool forward = last_position1_->from_index == ev.prev_index;
-      last_position1_->from_index = ev.index;
-      last_position1_->from = ev.point;
-
-      if (forward) {
-        last_position1_->to_index = ev.next_index;
-        last_position1_->to = ev.next;
-      }
-      else {
-        last_position1_->to_index = ev.prev_index;
-        last_position1_->to = ev.prev;
-      }
-    }
-    else if (ev.type == PointType::Begin) {
-      ScanLineArea to_insert1(ev.index, ev.point, ev.prev_index, ev.prev, false);
-      ScanLineArea to_insert2(ev.index, ev.point, ev.next_index, ev.next, true);
-      if (to_insert2 < to_insert1)
-        std::swap(to_insert1, to_insert2);
-
-      VISAGE_ASSERT(to_insert1.from != to_insert1.to);
-      VISAGE_ASSERT(to_insert2.from != to_insert2.to);
-      auto location = areas_.begin() + editPosition(ev.index);
-      last_position1_ = areas_.insert(location, to_insert2);
-      last_position1_ = areas_.insert(last_position1_, to_insert1);
-      last_position2_ = std::next(last_position1_);
-    }
-    else {
-      areas_.erase(findAreaByToIndex(ev.index));
-      auto to_erase = findAreaByToIndex(ev.index);
-      last_data_ = to_erase->data;
-      last_position1_ = areas_.erase(to_erase);
-      last_position2_ = last_position1_;
-    }
-
-    current_index_++;
-    progressToNextEvent();
-
-    VISAGE_ASSERT(areas_.size() % 2 == 0);
-  }
-
-  void Path::TriangulationGraph::ScanLine::updateDegeneracy(const Event& ev) {
-    last_position1_ = areas_.end();
-    processPointEvents(ev);
-
-    std::sort(new_areas_.begin(), new_areas_.end());
-
-    degeneracies_.clear();
-    for (auto& area : old_areas_) {
-      if (area.forward)
-        degeneracies_.push_back(area.to_index);
-    }
-
-    for (auto& area : new_areas_) {
-      if (!area.forward)
-        degeneracies_.push_back(area.from_index);
-    }
-
-    std::sort(degeneracies_.begin(), degeneracies_.end());
-
-    int old_index = 0;
-    pairInsOuts(old_areas_, [&, this](const ScanLineArea& area1, const ScanLineArea& area2, int) {
-      int index = degeneracies_[old_index++];
-      if (area1.forward) {
-        graph_->connect(area1.from_index, index);
-        graph_->connect(index, area2.from_index);
-      }
-      else {
-        graph_->connect(index, area1.from_index);
-        graph_->connect(area2.from_index, index);
-      }
-    });
-
-    next_areas_ = new_areas_;
-    int new_index = degeneracies_.size() - 1;
-    int edit_position = last_position1_ - areas_.begin();
-    pairInsOuts(new_areas_, [&, this](const ScanLineArea& area1, const ScanLineArea& area2, int i) {
-      int index = degeneracies_[new_index--];
-      edit_positions_[index] = edit_position + i;
-
-      if (area1.forward) {
-        graph_->connect(index, area1.to_index);
-        graph_->connect(area2.to_index, index);
-      }
-      else {
-        graph_->connect(area1.to_index, index);
-        graph_->connect(index, area2.to_index);
-      }
-    });
-
-    VISAGE_ASSERT(old_areas_.size() == new_areas_.size());
-    int new_i = 0;
-    for (auto old_area = old_areas_.begin(); old_area != old_areas_.end(); ++old_area, ++new_i) {
-      int index = degeneracies_[old_index++];
-      edit_positions_[index] = edit_position + new_i;
-
-      if (old_area->forward) {
-        graph_->connect(old_area->from_index, index);
-        graph_->connect(index, new_areas_[new_i].to_index);
-      }
-      else {
-        graph_->connect(index, old_area->from_index);
-        graph_->connect(new_areas_[new_i].to_index, index);
-      }
-    }
-
-    for (auto& area : next_areas_) {
-      if (area.forward)
-        area.from_index = graph_->prev_edge_[area.to_index];
-      else
-        area.from_index = graph_->next_edge_[area.to_index];
-    }
-
-    areas_.insert(last_position1_, next_areas_.begin(), next_areas_.end());
-    VISAGE_ASSERT(areas_.size() % 2 == 0);
-
-    old_areas_.clear();
-    new_areas_.clear();
-  }
-
-  bool Path::TriangulationGraph::ScanLine::updateSplitIntersections() {
-    Event ev = nextEvent();
-
-    if (next_intersection_ >= 0 && intersection_events_[next_intersection_].point <= ev.point)
-      return splitIntersection();
-
-    if (ev.type == PointType::Continue) {
-      last_position1_ = findAreaByToIndex(ev.index);
-      edit_positions_[ev.index] = last_position1_ - areas_.begin();
-      last_position2_ = last_position1_;
-
-      bool forward = last_position1_->from_index == ev.prev_index;
-      last_position1_->from_index = ev.index;
-      last_position1_->from = ev.point;
-
-      if (forward) {
-        last_position1_->to_index = ev.next_index;
-        last_position1_->to = ev.next;
-      }
-      else {
-        last_position1_->to_index = ev.prev_index;
-        last_position1_->to = ev.prev;
-      }
-
-      checkAddIntersection(safePrev(last_position1_));
-      checkAddIntersection(last_position1_);
-    }
-    else if (ev.type == PointType::Begin) {
-      ScanLineArea to_insert1(ev.index, ev.point, ev.prev_index, ev.prev, false);
-      ScanLineArea to_insert2(ev.index, ev.point, ev.next_index, ev.next, true);
-      if (to_insert2 < to_insert1)
-        std::swap(to_insert1, to_insert2);
-
-      VISAGE_ASSERT(to_insert1.from != to_insert1.to);
-      VISAGE_ASSERT(to_insert2.from != to_insert2.to);
-      auto lower_bound = std::lower_bound(areas_.begin(), areas_.end(), to_insert1);
-      edit_positions_[ev.index] = lower_bound - areas_.begin();
-      checkRemoveIntersection(safePrev(lower_bound));
-
-      last_position1_ = areas_.insert(lower_bound, to_insert2);
-      last_position1_ = areas_.insert(last_position1_, to_insert1);
-      last_position2_ = std::next(last_position1_);
-
-      checkAddIntersection(safePrev(last_position1_));
-      checkAddIntersection(last_position1_);
-      checkAddIntersection(last_position2_);
-    }
-    else {
-      auto end1 = findAreaByToIndex(ev.index);
-      for (auto it = std::next(end1); it->to_index != ev.index; ++it) {
-        if (it->from != ev.point && it->to != ev.point) {
-          checkRemoveIntersection(it);
-          checkRemoveIntersection(safePrev(it));
-          it->from = ev.point;
-          it->from_index = graph_->insertPointBetween(it->from_index, it->to_index, ev.point);
-          checkAddIntersection(it);
-          checkAddIntersection(safePrev(it));
-        }
-      }
-
-      last_position1_ = areas_.erase(end1);
-      if (last_position1_->to_index == ev.index) {
-        last_data_ = last_position1_->data;
-        last_position1_ = areas_.erase(last_position1_);
-        last_position2_ = last_position1_;
-      }
-      else {
-        auto end2 = findAreaByToIndex(ev.index, last_position1_);
-        last_data_ = end2->data;
-        last_position2_ = areas_.erase(end2);
-        checkAddIntersection(safePrev(last_position2_));
-      }
-      checkAddIntersection(safePrev(last_position1_));
-    }
-
-    current_index_++;
-    progressToNextEvent();
-    return false;
-  }
-
-  void Path::TriangulationGraph::ScanLine::updateBreakIntersections() {
-    Event ev = nextEvent();
-    if (ev.degeneracy)
-      updateDegeneracy(ev);
-    else
-      updateNormalEvent(ev);
-  }
-
-  void Path::TriangulationGraph::breakIntersections() {
-    if (intersections_broken_)
-      return;
-    intersections_broken_ = true;
-
-    VISAGE_ASSERT(checkValidPolygons());
-    removeLinearPoints();
-
-    bool intersection_added = true;
-    while (intersection_added) {
-      intersection_added = false;
-      scan_line_->reset();
-      while (scan_line_->hasNext()) {
-        if (scan_line_->updateSplitIntersections())
-          intersection_added = true;
-      }
-    }
-
-    simplify();
-    scan_line_->reset();
-    while (scan_line_->hasNext())
-      scan_line_->updateBreakIntersections();
-
-    simplify();
-  }
-
-  void Path::TriangulationGraph::fixWindings(FillRule fill_rule, int minimum_cycles) {
-    scan_line_->reset();
-
-    auto windings = std::make_unique<int[]>(points_.size());
-    auto reversed = std::make_unique<bool[]>(points_.size());
-    auto winding_directions = std::make_unique<int[]>(points_.size());
-
-    while (scan_line_->hasNext()) {
-      auto ev = scan_line_->nextEvent();
-      if (winding_directions[ev.index] == 0) {
-        bool convex = stableOrientation(ev.point, ev.prev, ev.next) >= 0.0;
-        auto area_iterator = scan_line_->begin() + scan_line_->editPosition(ev.index);
-
-        int current_winding = 0;
-        bool reverse = false;
-        if (area_iterator != scan_line_->end()) {
-          const auto& area = *area_iterator;
-          bool fill = winding_directions[area.from_index] == 1;
-          current_winding += windings[area.from_index];
-
-          bool inside_polygon = area.forward == fill;
-          if (inside_polygon) {
-            if (reversed[area.from_index] && fill_rule != FillRule::EvenOdd)
-              reverse = true;
-          }
-          else
-            current_winding -= winding_directions[area.from_index];
-        }
-
-        if (fill_rule == FillRule::EvenOdd) {
-          bool fill = (current_winding % 2) == 0;
-          reverse = convex != fill;
-        }
-        else if (fill_rule == FillRule::NonZero && current_winding == 0)
-          reverse = reverse || !convex;
-
-        if (reverse) {
-          reverseCycle(ev.index);
-          convex = !convex;
-        }
-
-        int winding_direction = convex ? 1 : -1;
-        int winding = current_winding + winding_direction;
-        for (int i = ev.index; winding_directions[i] == 0; i = next_edge_[i]) {
-          winding_directions[i] = winding_direction;
-          windings[i] = winding;
-          reversed[i] = reverse;
-        }
-      }
-
-      scan_line_->update();
-    }
-
-    if (fill_rule != FillRule::EvenOdd) {
-      for (int i = 0; i < points_.size(); ++i) {
-        if (next_edge_[i] == i)
-          continue;
-
-        bool empty = windings[i] < minimum_cycles;
-        bool was_empty = (windings[i] - winding_directions[i]) < minimum_cycles;
-
-        if (empty == was_empty)
-          removeCycle(i);
-      }
-    }
-  }
-
-  void Path::TriangulationGraph::reverse() {
-    for (int i = 0; i < points_.size(); ++i)
-      std::swap(prev_edge_[i], next_edge_[i]);
-  }
-
-  void Path::TriangulationGraph::breakSimpleIntoMonotonicPolygons() {
-    scan_line_->reset();
-    std::set<int> merge_vertices;
-
-    while (scan_line_->hasNext()) {
-      auto ev = scan_line_->nextEvent();
-
-      bool convex = stableOrientation(ev.point, ev.prev, ev.next) >= 0.0;
-      if (ev.type == PointType::Continue) {
-        scan_line_->update();
-
-        int diagonal_target = scan_line_->lastData();
-        if (!scan_line_->lastPosition1()->forward && merge_vertices.count(diagonal_target))
-          addDiagonal(ev.index, diagonal_target);
-
-        scan_line_->lastPosition1()->data = ev.index;
-        if (!scan_line_->lastPosition1()->forward) {
-          auto after = std::next(scan_line_->lastPosition1());
-          if (after != scan_line_->end())
-            after->data = ev.index;
-        }
-      }
-      else if (ev.type == PointType::Begin) {
-        scan_line_->update();
-
-        auto after = scan_line_->lastPosition2();
-        after->data = ev.index;
-
-        int diagonal_index = ev.index;
-        if (!convex) {
-          after = std::next(after);
-          diagonal_index = addDiagonal(ev.index, after->data);
-          after->data = ev.index;
-
-          auto before = scan_line_->safePrev(scan_line_->lastPosition1());
-          before->data = diagonal_index;
-        }
-
-        scan_line_->lastPosition1()->data = diagonal_index;
-      }
-      else {
-        scan_line_->update();
-        ScanLineArea scan_area(ev.prev_index, ev.prev, ev.index, ev.point, true);
-        auto area = scan_line_->lowerBound(scan_area);
-
-        if (convex && merge_vertices.count(scan_line_->lastData()))
-          addDiagonal(ev.index, scan_line_->lastData());
-
-        if (area != scan_line_->end()) {
-          if (!convex) {
-            area->data = ev.index;
-            area = scan_line_->safePrev(area);
-            if (area != scan_line_->end())
-              area->data = ev.index;
-            merge_vertices.insert(ev.index);
-          }
-        }
-      }
-    }
-
-    simplify();
-  }
-
-  std::vector<uint16_t> Path::TriangulationGraph::breakIntoTriangles() {
-    // TODO switch to Delaunay triangulation
-    std::vector<uint16_t> triangles;
-    auto sorted_indices = sortedIndices();
-    std::unique_ptr<bool[]> touched = std::make_unique<bool[]>(points_.size());
-
-    for (const auto& index : *sorted_indices) {
-      touched[index.index] = true;
-      cutEars(index.index, triangles, touched);
-    }
-
-    return triangles;
-  }
-
-  void Path::TriangulationGraph::singlePointOffset(double amount, int index, EndCap end_cap) {
+  Path::SubPath Path::singlePointOffset(Point point, float amount, EndCap end_cap) {
+    SubPath sub_path;
     if (amount < 0.0)
-      return;
+      return sub_path;
 
-    auto point = points_[index];
-    auto next_index = next_edge_[index];
+    sub_path.closed = true;
     if (end_cap == EndCap::Square) {
-      points_[index] += DPoint(amount, amount);
-      int current_index = index;
-      current_index = insertPointBetween(current_index, next_index, point + DPoint(amount, -amount));
-      current_index = insertPointBetween(current_index, next_index, point + DPoint(-amount, -amount));
-      current_index = insertPointBetween(current_index, next_index, point + DPoint(-amount, amount));
+      sub_path.points.push_back(point + Point(amount, amount));
+      sub_path.points.push_back(point + Point(amount, -amount));
+      sub_path.points.push_back(point + Point(-amount, -amount));
+      sub_path.points.push_back(point + Point(-amount, amount));
     }
     else if (end_cap == EndCap::Round) {
-      float adjusted_radius = (resolution_transform_ * Point(amount, 0.0f)).length();
-      double max_delta_radians = 2.0 * clampedACos(1.0 - kDefaultErrorTolerance / adjusted_radius);
+      float adjusted_radius = (resolution_matrix_ * Point(amount, 0.0f)).length();
+      float max_delta_radians = 2.0 * clampedACos(1.0 - kDefaultErrorTolerance / adjusted_radius);
       int num_points = std::max<int>(1, std::ceil(2.0 * kPi / max_delta_radians - 0.1));
-      std::complex<double> position(amount, 0.0);
-      double angle_delta = 2.0 * kPi / num_points;
-      std::complex<double> rotation = std::polar(1.0, -angle_delta);
-      int current_index = index;
+      std::complex<float> position(amount, 0.0);
+      float angle_delta = 2.0 * kPi / num_points;
+      std::complex<float> rotation = std::polar(1.0f, -angle_delta);
 
-      points_[index] += DPoint(position.real(), position.imag());
+      sub_path.points.push_back(point + Point(position.real(), position.imag()));
       for (int p = 1; p < num_points; ++p) {
         position *= rotation;
-        DPoint insert = point + DPoint(position.real(), position.imag());
-        current_index = insertPointBetween(current_index, next_index, insert);
+        sub_path.points.push_back(point + Point(position.real(), position.imag()));
       }
     }
+
+    return sub_path;
   }
 
-  void Path::TriangulationGraph::offset(double amount, Join join, EndCap end_cap, float miter_limit) {
-    static constexpr double kMinOffset = 0.001;
-    if (std::abs(amount) < kMinOffset)
-      return;
+  Path Path::offset(float amount, Join join, EndCap end_cap, float miter_limit) {
+    return offset(amount, join, Join::Miter, end_cap, miter_limit);
+  }
 
-    intersections_broken_ = false;
+  Path Path::offset(float amount, Join join, Join inner_join, EndCap end_cap, float miter_limit) {
+    static constexpr float kMinOffset = 0.001f;
+    Path result;
+
+    if (std::abs(amount) < kMinOffset)
+      return result;
 
     float square_miter_limit = miter_limit * miter_limit;
-    float adjusted_radius = (resolution_transform_ * Point(amount, 0.0f)).length();
-    double max_delta_radians = 2.0 * clampedACos(1.0 - kDefaultErrorTolerance / adjusted_radius);
-    int start_points = points_.size();
-    std::unique_ptr<bool[]> touched = std::make_unique<bool[]>(start_points);
-    for (int i = 0; i < start_points; ++i) {
-      if (touched[i])
+    float adjusted_radius = (resolution_matrix_ * Point(amount, 0.0f)).length();
+    float max_delta_radians = 2.0f * clampedACos(1.0 - kDefaultErrorTolerance / adjusted_radius);
+    for (const auto& sub_path : paths_) {
+      if (sub_path.points.empty())
         continue;
 
-      if (next_edge_[i] == i) {
-        singlePointOffset(amount, i, end_cap);
+      bool closed_points = sub_path.points.front() == sub_path.points.back();
+      if (sub_path.points.size() == 1 || (sub_path.points.size() == 2 && closed_points)) {
+        result.paths_.push_back(singlePointOffset(Point(sub_path.points[0]), amount, end_cap));
         continue;
       }
 
-      DPoint start = points_[i];
-      int last_index = prev_edge_[i];
-      DPoint prev = points_[last_index];
-      DPoint point = start;
-      DPoint prev_direction = (start - prev).normalized();
-      DPoint prev_offset = DPoint(-prev_direction.y, prev_direction.x) * amount;
-      int index = i;
-      while (!touched[index]) {
-        touched[index] = true;
-        int next_index = next_edge_[index];
-        DPoint next = index == last_index ? start : points_[next_index];
-        DPoint direction = (next - point).normalized();
-        auto offset = DPoint(-direction.y, direction.x) * amount;
+      std::vector<Point> new_path;
+      Point point = sub_path.points.back();
+      Point prev = sub_path.points[sub_path.points.size() - 2];
+      Point prev_direction = (point - prev).normalized();
+      Point prev_offset = Point(-prev_direction.y, prev_direction.x) * amount;
+
+      for (const Point& next : sub_path.points) {
+        if (next == point)
+          continue;
+
+        Point direction = (next - point).normalized();
+        auto offset = Point(-direction.y, direction.x) * amount;
 
         auto type = join;
         if (prev == next) {
@@ -1081,465 +456,64 @@ namespace visage {
           else if (end_cap == EndCap::Round)
             type = Join::Round;
         }
+        bool convex = stableOrientation(prev, point, next) <= 0.0;
+        if (convex == (amount < 0.0f))
+          type = inner_join;
+
         if (type == Join::Bevel) {
-          points_[index] += prev_offset;
-          insertPointBetween(index, next_index, point + offset);
+          new_path.push_back(point + prev_offset);
+          new_path.push_back(point + offset);
         }
         else if (type == Join::Square) {
-          DPoint square_offset = (prev_direction - direction).normalized() * amount;
-          DPoint square_center = point + square_offset;
-          DPoint square_tangent = DPoint(-square_offset.y, square_offset.x);
+          Point square_offset = (prev_direction - direction).normalized() * amount;
+          Point square_center = point + square_offset;
+          Point square_tangent = { -square_offset.y, square_offset.x };
           auto intersection_prev = findIntersection(square_center, square_center + square_tangent,
                                                     prev + prev_offset, point + prev_offset);
           auto intersection = findIntersection(square_center, square_center + square_tangent,
                                                point + offset, next + offset);
           VISAGE_ASSERT(intersection_prev.has_value());
           VISAGE_ASSERT(intersection.has_value());
-          points_[index] = intersection_prev.value();
-          insertPointBetween(index, next_index, intersection.value());
+          new_path.push_back(intersection_prev.value());
+          new_path.push_back(intersection.value());
         }
         else if (type == Join::Round) {
-          bool convex = stableOrientation(prev, point, next) <= 0.0;
-          if (convex == (amount > 0.0)) {
-            double arc_angle = clampedACos(prev_offset.dot(offset) / (amount * amount));
-            points_[index] += prev_offset;
-            int num_points = std::max(0.0, std::ceil(arc_angle / max_delta_radians - 0.1));
-            std::complex<double> position(prev_offset.x, prev_offset.y);
-            double angle_delta = arc_angle / (num_points + 1);
-            std::complex<double> rotation = std::polar(1.0, (amount < 0.0) ? angle_delta : -angle_delta);
-            int current_index = index;
+          float arc_angle = clampedACos(prev_offset.dot(offset) / (amount * amount));
+          new_path.push_back(point + prev_offset);
+          int num_points = std::max(0.0, std::ceil(arc_angle / max_delta_radians - 0.1));
+          std::complex<float> position(prev_offset.x, prev_offset.y);
+          float angle_delta = arc_angle / (num_points + 1);
+          std::complex<float> rotation = std::polar(1.0f, (amount < 0.0f) ? angle_delta : -angle_delta);
 
-            for (int p = 0; p < num_points; ++p) {
-              position *= rotation;
-              DPoint insert = point + DPoint(position.real(), position.imag());
-              current_index = insertPointBetween(current_index, next_index, insert);
-            }
+          for (int p = 0; p <= num_points; ++p) {
+            position *= rotation;
+            new_path.push_back(point + Point(position.real(), position.imag()));
           }
-          else
-            type = Join::Miter;
         }
-        if (type == Join::Miter) {
+        else if (type == Join::Miter) {
           auto intersection = findIntersection(prev + prev_offset, point + prev_offset,
                                                point + offset, next + offset);
           if (intersection.has_value() &&
               (intersection.value() - point).squareMagnitude() / (amount * amount) < square_miter_limit) {
-            points_[index] = intersection.value();
+            new_path.push_back(intersection.value());
           }
           else {
-            points_[index] += prev_offset;
-            if (point + offset != points_[index])
-              insertPointBetween(index, next_index, point + offset);
+            new_path.push_back(point + prev_offset);
+            if (point + offset != point)
+              new_path.push_back(point + offset);
           }
         }
 
-        if (index == last_index)
-          break;
-
-        index = next_index;
         prev = point;
         point = next;
         prev_direction = direction;
         prev_offset = offset;
       }
+
+      result.paths_.push_back(SubPath { std::move(new_path), true });
     }
 
-    simplify();
-    breakIntersections();
-    fixWindings(FillRule::Positive);
-  }
-
-  void Path::TriangulationGraph::combine(const TriangulationGraph& other) {
-    int offset = points_.size();
-    for (int i = 0; i < other.points_.size(); ++i) {
-      points_.push_back(other.points_[i]);
-      prev_edge_.push_back(other.prev_edge_[i] + offset);
-      next_edge_.push_back(other.next_edge_[i] + offset);
-    }
-    intersections_broken_ = false;
-
-    VISAGE_ASSERT(checkValidPolygons());
-  }
-
-  void Path::TriangulationGraph::removeLinearPoints() {
-    bool removed = true;
-    while (removed) {
-      removed = false;
-      for (int i = 0; i < points_.size(); ++i) {
-        if (i == next_edge_[i])
-          continue;
-
-        if (points_[i] == points_[next_edge_[i]]) {
-          removed = true;
-          removeFromCycle(i);
-        }
-        else {
-          while (i != next_edge_[i]) {
-            if (stableOrientation(points_[i], points_[next_edge_[i]], points_[next_edge_[next_edge_[i]]]))
-              break;
-
-            removed = true;
-            removeFromCycle(next_edge_[i]);
-          }
-        }
-      }
-    }
-  }
-
-  void Path::TriangulationGraph::simplify() {
-    for (int i = 0; i < points_.size(); ++i) {
-      if (i == next_edge_[i])
-        continue;
-
-      if (next_edge_[i] != -1 && points_[i] == points_[next_edge_[i]])
-        removeFromCycle(i);
-    }
-  }
-
-  Path Path::TriangulationGraph::toPath() const {
-    std::unique_ptr<bool[]> visited = std::make_unique<bool[]>(points_.size());
-    Path path;
-    for (int i = 0; i < points_.size(); ++i) {
-      if (i == next_edge_[i] || visited[i])
-        continue;
-
-      path.moveTo(Point(points_[i]));
-
-      int index = next_edge_[i];
-      while (!visited[index]) {
-        path.lineTo(Point(points_[index]));
-        visited[index] = true;
-        index = next_edge_[index];
-      }
-
-      path.close();
-    }
-    return path;
-  }
-
-  Path::TriangulationGraph::PointType Path::TriangulationGraph::pointType(int index) const {
-    int prev_index = prev_edge_[index];
-    if (prev_index == index)
-      return PointType::None;
-
-    int next_index = next_edge_[index];
-    if (prev_index < 0)
-      prev_index = index;
-    if (next_index < 0)
-      next_index = index;
-    double compare_prev = points_[index].compare(points_[prev_index]);
-    double compare_next = points_[index].compare(points_[next_index]);
-
-    if (compare_prev < 0.0 && compare_next < 0.0)
-      return PointType::Begin;
-    if (compare_prev > 0.0 && compare_next > 0.0)
-      return PointType::End;
-    return PointType::Continue;
-  }
-
-  int Path::TriangulationGraph::addAdditionalPoint(const DPoint& point) {
-    points_.push_back(point);
-    int new_index = points_.size() - 1;
-    prev_edge_.push_back(new_index);
-    next_edge_.push_back(new_index);
-    return new_index;
-  }
-
-  int Path::TriangulationGraph::insertPointBetween(int start_index, int end_index, const DPoint& point) {
-    if (next_edge_[start_index] != end_index)
-      std::swap(start_index, end_index);
-
-    VISAGE_ASSERT(points_[start_index] != point);
-    VISAGE_ASSERT(points_[end_index] != point);
-    VISAGE_ASSERT(next_edge_[start_index] == end_index);
-    VISAGE_ASSERT(prev_edge_[end_index] == start_index);
-
-    int new_index = addAdditionalPoint(point);
-    connect(start_index, new_index);
-    connect(new_index, end_index);
-    return new_index;
-  }
-
-  bool Path::TriangulationGraph::connected(int a_index, int b_index) const {
-    return prev_edge_[a_index] == b_index || next_edge_[a_index] == b_index;
-  }
-
-  void Path::TriangulationGraph::connect(int from, int to) {
-    next_edge_[from] = to;
-    prev_edge_[to] = from;
-  }
-
-  void Path::TriangulationGraph::removeFromCycle(int index) {
-    int prev = prev_edge_[index];
-    int next = next_edge_[index];
-    prev_edge_[index] = index;
-    next_edge_[index] = index;
-    connect(prev, next);
-  }
-
-  bool Path::TriangulationGraph::checkValidPolygons() const {
-    for (int i = 0; i < points_.size(); ++i) {
-      if (prev_edge_[next_edge_[i]] != i || next_edge_[prev_edge_[i]] != i)
-        return false;
-    }
-    return true;
-  }
-
-  const std::vector<Path::TriangulationGraph::IndexData>* Path::TriangulationGraph::sortedIndices() {
-    sorted_indices_.reserve(prev_edge_.size());
-    auto unchanged = [this](IndexData& data) {
-      const auto& point = points_[data.index];
-      auto type = pointType(data.index);
-      if (data.point == point && data.type == type)
-        return true;
-
-      data.point = point;
-      data.type = type;
-      return false;
-    };
-
-    int updated_index = std::stable_partition(sorted_indices_.begin(), sorted_indices_.end(), unchanged) -
-                        sorted_indices_.begin();
-
-    for (int i = sorted_indices_.size(); i < prev_edge_.size(); ++i)
-      sorted_indices_.emplace_back(i, points_[i], pointType(i));
-
-    std::sort(sorted_indices_.begin() + updated_index, sorted_indices_.end());
-    std::inplace_merge(sorted_indices_.begin(), sorted_indices_.begin() + updated_index,
-                       sorted_indices_.end());
-
-    return &sorted_indices_;
-  }
-
-  void Path::TriangulationGraph::removeCycle(int start_index) {
-    for (int i = start_index; next_edge_[i] != i;) {
-      int next = next_edge_[i];
-      prev_edge_[i] = i;
-      next_edge_[i] = i;
-      i = next;
-    }
-  }
-
-  void Path::TriangulationGraph::reverseCycle(int start_index) {
-    std::swap(prev_edge_[start_index], next_edge_[start_index]);
-    for (int i = next_edge_[start_index]; i != start_index; i = next_edge_[i])
-      std::swap(prev_edge_[i], next_edge_[i]);
-  }
-
-  int Path::TriangulationGraph::addDiagonal(int index, int target) {
-    int new_index = prev_edge_.size();
-    int new_diagonal_index = new_index + 1;
-    scan_line_->addAlias(new_index, index);
-    scan_line_->addAlias(new_diagonal_index, target);
-    points_.push_back(points_[index]);
-    points_.push_back(points_[target]);
-
-    next_edge_[prev_edge_[target]] = new_diagonal_index;
-    prev_edge_[next_edge_[index]] = new_index;
-
-    prev_edge_.push_back(new_diagonal_index);
-    next_edge_.push_back(next_edge_[index]);
-    prev_edge_.push_back(prev_edge_[target]);
-    next_edge_.push_back(new_index);
-
-    connect(index, target);
-
-    return new_index;
-  }
-
-  bool Path::TriangulationGraph::tryCutEar(int index, bool forward, std::vector<uint16_t>& triangles,
-                                           const std::unique_ptr<bool[]>& touched) {
-    auto& direction = forward ? next_edge_ : prev_edge_;
-    auto& reverse = forward ? prev_edge_ : next_edge_;
-
-    int intermediate_index = direction[index];
-    int target_index = direction[intermediate_index];
-    if (intermediate_index == index || target_index == index || !touched[intermediate_index] ||
-        !touched[target_index]) {
-      return false;
-    }
-
-    DPoint start = points_[index];
-    DPoint intermediate = points_[intermediate_index];
-    DPoint target = points_[target_index];
-
-    double orientation = stableOrientation(start, intermediate, target);
-    if ((orientation < 0.0) != forward && orientation)
-      return false;
-
-    if (orientation) {
-      triangles.push_back(index);
-      triangles.push_back(intermediate_index);
-      triangles.push_back(target_index);
-    }
-    direction[index] = target_index;
-    reverse[target_index] = index;
-
-    direction[intermediate_index] = intermediate_index;
-    reverse[intermediate_index] = intermediate_index;
-    return true;
-  }
-
-  void Path::TriangulationGraph::cutEars(int index, std::vector<uint16_t>& triangles,
-                                         const std::unique_ptr<bool[]>& touched) {
-    while (tryCutEar(index, true, triangles, touched))
-      ;
-    while (tryCutEar(index, false, triangles, touched))
-      ;
-  }
-
-  Path::Triangulation Path::triangulate() {
-    return triangulationGraph()->triangulate(fillRule());
-  }
-
-  Path Path::combine(Path& other, Operation operation) {
-    switch (operation) {
-    case Operation::Union: return combine(other, FillRule::NonZero, 1, false);
-    case Operation::Intersection: return combine(other, FillRule::NonZero, 2, false);
-    case Operation::Difference: return combine(other, FillRule::Positive, 1, true);
-    case Operation::Xor: return combine(other, FillRule::EvenOdd, 1, false);
-    default: return *this;
-    }
-  }
-
-  Path Path::combine(Path& other, FillRule fill_rule, int num_cycles_needed, bool reverse_other) {
-    triangulationGraph()->breakIntersections();
-    other.triangulationGraph()->breakIntersections();
-
-    TriangulationGraph graph = *triangulationGraph();
-    TriangulationGraph other_graph = *other.triangulationGraph();
-    graph.fixWindings(fillRule());
-    other_graph.fixWindings(other.fillRule());
-    if (reverse_other)
-      other_graph.reverse();
-
-    graph.combine(other_graph);
-    graph.breakIntersections();
-    graph.fixWindings(fill_rule, num_cycles_needed);
-    return graph.toPath();
-  }
-
-  struct AntiAliasPathPoints {
-    std::vector<Point> inner_points;
-    std::vector<Point> outer_points;
-    std::vector<bool> new_outer;
-  };
-
-  AntiAliasPathPoints antiAliasOffsetSubPath(const Path::SubPath& sub_path, float amount,
-                                             float max_delta_radians) {
-    AntiAliasPathPoints results;
-    int num_points = sub_path.points.size();
-    Point point = sub_path.points[num_points - 2];
-    Point prev = sub_path.points[num_points - 3];
-    Point prev_direction = (point - prev).normalized();
-    Point prev_offset = Point(-prev_direction.y, prev_direction.x) * amount;
-    for (int i = 0; i < num_points - 1; i++) {
-      Point next = sub_path.points[i];
-      Point direction = (next - point).normalized();
-      auto offset = Point(-direction.y, direction.x) * amount;
-
-      if (stableOrientation(prev, point, next) <= 0.0f) {
-        results.inner_points.push_back(point);
-        float arc_angle = clampedACos(prev_offset.dot(offset) / (amount * amount));
-        int curve_points = std::max(0.0, std::ceil(arc_angle / max_delta_radians - 0.1));
-        std::complex<float> position(prev_offset.x, prev_offset.y);
-        float angle_delta = arc_angle / (curve_points + 1);
-        std::complex<float> rotation = std::polar(1.0f, -angle_delta);
-
-        results.outer_points.push_back(point + prev_offset);
-        for (int p = 0; p <= curve_points; ++p) {
-          position *= rotation;
-          results.outer_points.push_back(point + Point(position.real(), position.imag()));
-          results.new_outer.push_back(true);
-        }
-      }
-      else {
-        results.inner_points.push_back(point);
-        auto intersection = Path::findIntersection(prev + prev_offset, point + prev_offset,
-                                                   point + offset, next + offset);
-        float min_comp = std::min((point - prev).squareMagnitude(), (next - point).squareMagnitude());
-        if (intersection.has_value() && (intersection.value() - point).squareMagnitude() < min_comp)
-          results.outer_points.push_back(intersection.value());
-        else
-          results.outer_points.push_back(point + prev_offset);
-      }
-
-      prev = point;
-      point = next;
-      prev_offset = offset;
-
-      results.new_outer.push_back(true);
-      results.new_outer.push_back(false);
-    }
-    return results;
-  }
-
-  void addAntiAliasOffsetToTriangulation(AntiAliasPathPoints& offset,
-                                         Path::AntiAliasTriangulation& triangulation) {
-    offset.inner_points.push_back(offset.inner_points[0]);
-    offset.outer_points.push_back(offset.outer_points[0]);
-    triangulation.alphas.reserve(triangulation.points.size() + offset.inner_points.size() +
-                                 offset.outer_points.size());
-
-    int inner_offset = triangulation.points.size();
-    triangulation.points.insert(triangulation.points.end(), offset.inner_points.begin(),
-                                offset.inner_points.end());
-    for (int i = inner_offset; i < triangulation.points.size(); ++i)
-      triangulation.alphas.push_back(1.0f);
-
-    int outer_offset = triangulation.points.size();
-    triangulation.points.insert(triangulation.points.end(), offset.outer_points.begin(),
-                                offset.outer_points.end());
-    for (int i = outer_offset; i < triangulation.points.size(); ++i)
-      triangulation.alphas.push_back(0.0f);
-
-    int inner_index = 0;
-    int outer_index = 0;
-    triangulation.triangles.reserve(triangulation.triangles.size() + offset.new_outer.size());
-    for (bool new_out : offset.new_outer) {
-      triangulation.triangles.push_back(outer_offset + outer_index);
-      triangulation.triangles.push_back(inner_offset + inner_index);
-      if (new_out) {
-        ++outer_index;
-        triangulation.triangles.push_back(outer_offset + outer_index);
-      }
-      else {
-        ++inner_index;
-        triangulation.triangles.push_back(inner_offset + inner_index);
-      }
-    }
-  }
-
-  Path::AntiAliasTriangulation Path::offsetAntiAlias(float scale) {
-    auto inner_triangulation = triangulate();
-    AntiAliasTriangulation triangulation;
-    float amount = 1.0f / scale;
-    float max_delta_radians = 2.0f * clampedACos(1.0f - error_tolerance_ / amount);
-
-    for (const auto& sub_path : paths_) {
-      if (sub_path.points.size() < 4)
-        continue;
-
-      auto aa_sub_path = antiAliasOffsetSubPath(sub_path, amount, max_delta_radians);
-      addAntiAliasOffsetToTriangulation(aa_sub_path, triangulation);
-    }
-
-    int inner_point_offset = triangulation.points.size();
-    triangulation.points.insert(triangulation.points.end(), inner_triangulation.points.begin(),
-                                inner_triangulation.points.end());
-    for (int i = inner_point_offset; i < triangulation.points.size(); ++i)
-      triangulation.alphas.push_back(1.0f);
-
-    triangulation.triangles.reserve(triangulation.triangles.size() + inner_triangulation.triangles.size());
-    for (int index : inner_triangulation.triangles)
-      triangulation.triangles.push_back(index + inner_point_offset);
-
-    return triangulation;
-  }
-
-  Path Path::offset(float offset, Join join, float miter_limit) {
-    TriangulationGraph graph = *triangulationGraph();
-    graph.offset(offset, join, EndCap::Butt, miter_limit);
-    return graph.toPath();
+    return result;
   }
 
   Path Path::stroke(float stroke_width, Join join, EndCap end_cap, std::vector<float> dash_array,
@@ -1580,7 +554,6 @@ namespace visage {
         auto prev = path.points[0];
         stroke_path.moveTo(prev);
         for (int i = 1; i < path.points.size(); ++i) {
-          stroke_path.setPointValue(path.values[i]);
           auto length = (path.points[i] - prev).length();
           while (length > dash_length) {
             auto ratio = dash_length / length;
@@ -1609,31 +582,285 @@ namespace visage {
     else
       stroke_path = *this;
 
+    std::vector<SubPath> inner_paths;
     for (auto& path : stroke_path.paths_) {
-      if (path.points.size() > 2 && path.closed && path.points.front() == path.points.back()) {
-        path.points.push_back(path.points.front());
-        path.values.push_back(path.values.front());
-        path.points.push_back(path.points[1]);
-        path.values.push_back(path.values[1]);
+      if (path.points.size() > 1 && path.closed) {
+        SubPath inner = path;
+        std::reverse(inner.points.begin(), inner.points.end());
+        inner_paths.push_back(inner);
       }
 
-      int start_size = path.points.size();
-      for (int i = start_size - 2; i > 0; --i) {
-        path.points.push_back(path.points[i]);
-        path.values.push_back(path.values[i]);
+      else {
+        int start_size = path.points.size();
+        for (int i = start_size - 2; i > 0; --i)
+          path.points.push_back(path.points[i]);
       }
     }
 
-    TriangulationGraph graph(&stroke_path);
-    graph.simplify();
-    graph.offset(stroke_width / 2.0f, join, end_cap, miter_limit);
-    return graph.toPath();
+    stroke_path.paths_.insert(stroke_path.paths_.end(), inner_paths.begin(), inner_paths.end());
+    stroke_path = stroke_path.offset(stroke_width / 2.0f, join, Join::Bevel, end_cap, miter_limit);
+    stroke_path.fill_rule_ = FillRule::NonZero;
+    return stroke_path;
   }
 
-  Path Path::breakIntoSimplePolygons() {
-    triangulationGraph()->breakIntersections();
-    TriangulationGraph graph = *triangulationGraph();
-    graph.fixWindings(fillRule());
-    return graph.toPath();
+  struct PathAtlasTexture {
+    bgfx::FrameBufferHandle handle = { bgfx::kInvalidHandle };
+
+    ~PathAtlasTexture() {
+      if (bgfx::isValid(handle))
+        bgfx::destroy(handle);
+    }
+  };
+
+  PathAtlas::PackedPathReference::~PackedPathReference() {
+    if (auto atlas_pointer = atlas.lock())
+      (*atlas_pointer)->removePath(packed_path_rect);
+  }
+
+  PathAtlas::PathAtlas() {
+    reference_ = std::make_shared<PathAtlas*>(this);
+    atlas_map_.setPadding(kBuffer);
+  }
+
+  PathAtlas::~PathAtlas() = default;
+
+  template<const char* name>
+  void setPathUniform(float value0, float value1 = 0.0f, float value2 = 0.0f, float value3 = 0.0f) {
+    float values[4] = { value0, value1, value2, value3 };
+    static const bgfx::UniformHandle uniform = bgfx::createUniform(name, bgfx::UniformType::Vec4, 1);
+    bgfx::setUniform(uniform, values);
+  }
+
+  bool PathAtlas::clearUpdatedPathAreas(int submit_pass) {
+    int total_need_update = 0;
+    for (auto& path : paths_) {
+      if (path->needs_update)
+        ++total_need_update;
+    }
+
+    if (total_need_update == 0)
+      return false;
+
+    float width_scale = 2.0f / width_;
+    float height_scale = 2.0f / height_;
+
+    bgfx::setViewMode(submit_pass, bgfx::ViewMode::Sequential);
+    bgfx::setViewRect(submit_pass, 0, 0, width_, height_);
+    bgfx::setViewClear(submit_pass, BGFX_CLEAR_NONE);
+    bgfx::setViewFrameBuffer(submit_pass, frame_buffer_->handle);
+    bgfx::setState(BGFX_STATE_WRITE_R | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ZERO));
+    auto clear_vertices = initQuadVertices<UvVertex>(total_need_update);
+    int vertex_index = 0;
+    for (auto& path : paths_) {
+      if (path->needs_update) {
+        float left = path->x * width_scale - 1.0f;
+        float top = 1.0f - path->y * height_scale;
+        float right = left + path->w * width_scale;
+        float bottom = top - path->h * height_scale;
+        clear_vertices[vertex_index].x = left;
+        clear_vertices[vertex_index].y = top;
+        clear_vertices[vertex_index + 1].x = right;
+        clear_vertices[vertex_index + 1].y = top;
+        clear_vertices[vertex_index + 2].x = left;
+        clear_vertices[vertex_index + 2].y = bottom;
+        clear_vertices[vertex_index + 3].x = right;
+        clear_vertices[vertex_index + 3].y = bottom;
+        clear_vertices[vertex_index].u = 1.0f;
+        clear_vertices[vertex_index].v = 0.0f;
+        clear_vertices[vertex_index + 1].u = 1.0f;
+        clear_vertices[vertex_index + 1].v = 0.0f;
+        clear_vertices[vertex_index + 2].u = 0.0f;
+        clear_vertices[vertex_index + 2].v = 0.0f;
+        clear_vertices[vertex_index + 3].u = 0.0f;
+        clear_vertices[vertex_index + 3].v = 0.0f;
+        vertex_index += 4;
+      }
+    }
+
+    if (bgfx::getCaps()->originBottomLeft) {
+      for (int i = 0; i < vertex_index; ++i)
+        clear_vertices[i].y = -clear_vertices[i].y;
+    }
+
+    setPathUniform<Uniforms::kColor>(0.0f);
+    bgfx::submit(submit_pass, ProgramCache::programHandle(shaders::vs_clear, shaders::fs_clear));
+
+    return true;
+  }
+
+  int PathAtlas::updatePaths(int submit_pass) {
+    constexpr int kTriangleIndices[] = { 0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5 };
+    constexpr int kConservativeVerticesPerTriangle = 3;
+    constexpr int kRegularVerticesPerTriangle = 6;
+    constexpr float kTriangleDrawOffset = 2.0f;
+
+    checkInit();
+
+    if (!clearUpdatedPathAreas(submit_pass))
+      return submit_pass;
+
+    int num_triangles = 0;
+    for (auto& path : paths_) {
+      if (path->needs_update) {
+        for (const auto& sub_path : path->path.subPaths()) {
+          if (sub_path.points.size() > 2)
+            num_triangles += sub_path.points.size();
+        }
+      }
+    }
+
+    auto state = BGFX_STATE_WRITE_R | BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE);
+    int vertices_per_triangle = kRegularVerticesPerTriangle;
+    int indices_per_triangle = sizeof(kTriangleIndices) / sizeof(int);
+    int vertices_per_point = 2;
+    bool conservative_raster = bgfx::getCaps()->supported & BGFX_CAPS_CONSERVATIVE_RASTER;
+    if (conservative_raster) {
+      state |= BGFX_STATE_CONSERVATIVE_RASTER;
+      vertices_per_triangle = kConservativeVerticesPerTriangle;
+      indices_per_triangle = 3;
+      vertices_per_point = 1;
+    }
+
+    bgfx::setState(state);
+    bgfx::TransientVertexBuffer vertex_buffer {};
+    bgfx::TransientIndexBuffer index_buffer {};
+    int num_vertices = num_triangles * vertices_per_triangle;
+    int num_indices = num_triangles * indices_per_triangle;
+    if (!bgfx::allocTransientBuffers(&vertex_buffer, PathVertex::layout(), num_vertices,
+                                     &index_buffer, num_indices, true)) {
+      VISAGE_LOG("PathAtlas::updatePaths: Failed to allocate transient buffers");
+      return submit_pass + 1;
+    }
+
+    auto vertices = reinterpret_cast<PathVertex*>(vertex_buffer.data);
+    auto indices = reinterpret_cast<uint32_t*>(index_buffer.data);
+    if (indices == nullptr || vertices == nullptr) {
+      VISAGE_LOG("PathAtlas::updatePaths: Failed to map transient buffers");
+      return submit_pass + 1;
+    }
+
+    bgfx::setVertexBuffer(0, &vertex_buffer);
+    bgfx::setIndexBuffer(&index_buffer);
+
+    uint32_t vertex = 0;
+    uint32_t triangle_index = 0;
+    for (auto& path : paths_) {
+      if (path->needs_update) {
+        path->needs_update = false;
+
+        for (const auto& sub_path : path->path.subPaths()) {
+          if (sub_path.points.size() <= 2)
+            continue;
+
+          float average_x = 0.0f;
+          float max_y = 0.0f;
+          for (const auto& point : sub_path.points) {
+            max_y = std::max(max_y, point.y);
+            average_x += point.x;
+          }
+          average_x /= static_cast<float>(sub_path.points.size());
+
+          float x = path->x;
+          float y = path->y;
+          float anchor_x = x + average_x;
+          float anchor_y = y + max_y + kTriangleDrawOffset;
+          float last_x = x + sub_path.points.back().x;
+          float last_y = y + sub_path.points.back().y;
+          for (int i = 0; i < sub_path.points.size(); ++i) {
+            for (int k = 0; k < indices_per_triangle; ++k)
+              indices[triangle_index++] = vertex + kTriangleIndices[k];
+
+            float new_x = x + sub_path.points[i].x;
+            float new_y = y + sub_path.points[i].y;
+            float index = 0.0f;
+
+            for (int v = vertex; v < vertex + vertices_per_triangle;) {
+              float direction = 1.0f;
+              for (int p = 0; p < vertices_per_point; ++p, ++v) {
+                vertices[v].index = index;
+                vertices[v].direction = direction;
+                direction *= -1.0f;
+              }
+              index += 1.0f;
+            }
+
+            for (int v = 0; v < vertices_per_triangle; ++v) {
+              vertices[vertex].x1 = anchor_x;
+              vertices[vertex].y1 = anchor_y;
+              vertices[vertex].x2 = last_x;
+              vertices[vertex].y2 = last_y;
+              vertices[vertex].x3 = new_x;
+              vertices[vertex].y3 = new_y;
+              ++vertex;
+            }
+
+            last_x = new_x;
+            last_y = new_y;
+          }
+        }
+      }
+    }
+
+    VISAGE_ASSERT(vertex == num_vertices);
+    VISAGE_ASSERT(triangle_index == num_indices);
+
+    bool origin_flip = bgfx::getCaps()->originBottomLeft;
+    setPathUniform<Uniforms::kColor>(1.0f);
+    setPathUniform<Uniforms::kOriginFlip>(origin_flip ? -1.0 : 1.0);
+
+    if (origin_flip)
+      setPathUniform<Uniforms::kBounds>(2.0f / width_, 2.0f / height_, -1.0f, -1.0f);
+    else
+      setPathUniform<Uniforms::kBounds>(2.0f / width_, -2.0f / height_, -1.0f, 1.0f);
+
+    if (conservative_raster)
+      bgfx::submit(submit_pass, ProgramCache::programHandle(shaders::vs_conservative_path_fill,
+                                                            shaders::fs_path_fill));
+    else
+      bgfx::submit(submit_pass, ProgramCache::programHandle(shaders::vs_path_fill, shaders::fs_path_fill));
+    return submit_pass + 1;
+  }
+
+  void PathAtlas::destroy() {
+    frame_buffer_.reset();
+  }
+
+  void PathAtlas::checkInit() {
+    constexpr uint64_t kFlags = BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP;
+    if (needs_packing_) {
+      resize();
+      needs_packing_ = false;
+    }
+
+    if (frame_buffer_ == nullptr)
+      frame_buffer_ = std::make_unique<PathAtlasTexture>();
+
+    if (!bgfx::isValid(frame_buffer_->handle) && atlas_map_.width() && atlas_map_.height()) {
+      frame_buffer_->handle = bgfx::createFrameBuffer(atlas_map_.width(), atlas_map_.height(),
+                                                      bgfx::TextureFormat::R16F, kFlags);
+      width_ = atlas_map_.width();
+      height_ = atlas_map_.height();
+    }
+  }
+
+  void PathAtlas::resize() {
+    static constexpr float kShrinkFactor = 0.5f;
+    atlas_map_.pack(width_, height_);
+    if (atlas_map_.width() > width_ || atlas_map_.height() > height_ ||
+        atlas_map_.width() < width_ * kShrinkFactor || atlas_map_.height() < height_ * kShrinkFactor)
+      frame_buffer_.reset();
+
+    for (auto& path : paths_) {
+      const PackedRect& rect = atlas_map_.rectForId(path.get());
+      path->x = rect.x;
+      path->y = rect.y;
+      path->w = rect.w;
+      path->h = rect.h;
+      path->needs_update = true;
+    }
+  }
+
+  const bgfx::FrameBufferHandle& PathAtlas::frameBufferHandle() {
+    return frame_buffer_->handle;
   }
 }

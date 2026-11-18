@@ -29,6 +29,7 @@ namespace visage {
   class Window;
   class WindowEventHandler;
   class ClientWindowDecoration;
+
   /**
    * @class TopLevelFrame
    * @brief Represents the top-level frame in the application editor.
@@ -91,11 +92,28 @@ namespace visage {
     ~ApplicationEditor() override;
 
     /**
+     * @brief Returns a callback list for the window show event.
+     * @return A reference to the on_show_ callback list.
+     */
+    auto& onShow() { return on_show_; }
+    /**
+     * @brief Returns a callback list for the window hide event.
+     * @return A reference to the on_hide_ callback list.
+     */
+    auto& onHide() { return on_hide_; }
+    auto& onCloseRequested() { return on_close_requested_; }
+    /**
+     * @brief Returns a callback list for the window contents resized event.
+     * @return A reference to the on_window_contents_resized_ callback list.
+     */
+    auto& onWindowContentsResized() { return on_window_contents_resized_; }
+
+    void notifyContentsResized();
+    /**
      * @brief Takes a screenshot of the current view.
      * @return A const reference to the Screenshot object.
      */
     const Screenshot& takeScreenshot();
-
     /**
      * @brief Sets the canvas details for drawing.
      */
@@ -216,11 +234,17 @@ namespace visage {
     FrameEventHandler event_handler_;
     std::unique_ptr<Canvas> canvas_;
     std::unique_ptr<TopLevelFrame> top_level_;
-    std::unique_ptr<WindowEventHandler> window_event_handler_;
-    float fixed_aspect_ratio_ = 0.0f;
 
+    std::unique_ptr<WindowEventHandler> window_event_handler_;
+    CallbackList<void()> on_show_;
+    CallbackList<void()> on_hide_;
+    CallbackList<bool()> on_close_requested_;
+    CallbackList<void()> on_window_contents_resized_;
+
+    float fixed_aspect_ratio_ = 0.0f;
     float min_width_ = 0.0f;
     float min_height_ = 0.0f;
+
     std::vector<Frame*> stale_children_;
     std::vector<Frame*> drawing_children_;
 

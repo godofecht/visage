@@ -110,6 +110,7 @@ void ClapPlugin::guiDestroy() noexcept {
 #endif
 
   app_->close();
+  app_ = nullptr;
 }
 
 // The host provides a native window handle. Visage's `show` method can accept this

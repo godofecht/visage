@@ -92,6 +92,10 @@ namespace visage {
                                       bool vertical_resize) { }
       virtual void handleResized(int width, int height) = 0;
 
+      virtual void handleWindowShown() = 0;
+      virtual void handleWindowHidden() = 0;
+      virtual bool handleCloseRequested() = 0;
+
       virtual bool handleFileDrag(int x, int y, const std::vector<std::string>& files) = 0;
       virtual void handleFileDragLeave() = 0;
       virtual bool handleFileDrop(int x, int y, const std::vector<std::string>& files) = 0;
@@ -107,9 +111,6 @@ namespace visage {
     Window(int width, int height);
     virtual ~Window() = default;
 
-    auto& onShow() { return on_show_; }
-    auto& onHide() { return on_hide_; }
-    auto& onWindowContentsResized() { return on_contents_resized_; }
     /**
      * @brief Enters the platform-specific event loop. This function will block until the window is closed.
      */
@@ -120,7 +121,6 @@ namespace visage {
      */
     virtual void* nativeHandle() const = 0;
     virtual void windowContentsResized(int width, int height) = 0;
-    virtual bool closeRequested() { return true; }
 
     virtual void* initWindow() const { return nullptr; }
     virtual void* globalDisplay() const { return nullptr; }
@@ -155,9 +155,6 @@ namespace visage {
     virtual void setFixedAspectRatio(bool fixed) { }
     virtual IPoint maxWindowDimensions() const = 0;
     virtual void setAlwaysOnTop(bool on_top) { }
-
-    void notifyShow() const { on_show_.callback(); }
-    void notifyHide() const { on_hide_.callback(); }
 
     void setDrawCallback(std::function<void(double)> callback) {
       draw_callback_ = std::move(callback);
@@ -214,6 +211,10 @@ namespace visage {
     void handleResized(int width, int height);
     void handleAdjustResize(int* width, int* height, bool horizontal_resize, bool vertical_resize);
 
+    void handleWindowShown();
+    void handleWindowHidden();
+    bool handleCloseRequested();
+
     bool handleKeyDown(KeyCode key_code, int modifiers, bool repeat);
     bool handleKeyUp(KeyCode key_code, int modifiers);
     bool handleTextInput(const std::string& text);
@@ -240,9 +241,6 @@ namespace visage {
     RepeatClick mouse_repeat_clicks_;
 
     std::function<void(double)> draw_callback_ = nullptr;
-    CallbackList<void()> on_show_;
-    CallbackList<void()> on_hide_;
-    CallbackList<void()> on_contents_resized_;
     float dpi_scale_ = 1.0f;
     bool visible_ = true;
     bool mouse_relative_mode_ = false;

@@ -210,6 +210,10 @@ namespace visage {
       return convertUtf32ToUtf8<std::u32string>(convertUtf16ToUtf32<std::wstring>(w_str));
     }
 
+    static int naturalCompare(const String& a, const String& b);
+    static int naturalCompare(const std::u32string& a, const std::u32string& b);
+    static int naturalCompare(const std::string& a, const std::string& b);
+
     String() = default;
 
     String(std::u32string string) : string_(std::move(string)) { }
@@ -304,6 +308,9 @@ namespace visage {
       }
     }
 
+    int compare(const String& other) const { return string_.compare(other.string_); }
+    int naturalCompare(const String& other) const { return naturalCompare(string_, other.string_); }
+
     String toLower() const;
     String toUpper() const;
     String removeCharacters(const String& characters) const;
@@ -316,7 +323,7 @@ namespace visage {
       try {
         return std::stof(toUtf8());
       }
-      catch (const std::exception&) {
+      catch (...) {
         return 0.0f;
       }
     }
@@ -328,7 +335,7 @@ namespace visage {
       try {
         return std::stoi(toUtf8());
       }
-      catch (const std::exception&) {
+      catch (...) {
         return 0;
       }
     }

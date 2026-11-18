@@ -99,6 +99,7 @@ namespace visage {
     }
 
     bool isNone() const { return gradient.isNone(); }
+    bool isCurrentColor() const { return type == Type::CurrentColor; }
 
     Gradient gradient;
     Transform transform;
@@ -161,15 +162,30 @@ namespace visage {
     }
 
     void setAllFillBrush(const Brush& brush) {
-      fill_brush = brush;
+      if ((!state.fill_gradient.isNone() || state.fill_gradient.isCurrentColor()) &&
+          state.fill_opacity > 0.0f) {
+        fill_brush = brush;
+      }
       for (auto& child : children)
         child->setAllFillBrush(brush);
     }
 
     void setAllStrokeBrush(const Brush& brush) {
-      stroke_brush = brush;
+      if ((!state.stroke_gradient.isNone() || state.stroke_gradient.isCurrentColor()) &&
+          state.stroke_opacity > 0.0f) {
+        stroke_brush = brush;
+      }
       for (auto& child : children)
         child->setAllStrokeBrush(brush);
+    }
+
+    void setAllCurrentColor(const Brush& brush) {
+      if (state.fill_gradient.isCurrentColor() && state.fill_opacity > 0.0f)
+        fill_brush = brush;
+      if (state.stroke_gradient.isCurrentColor() && state.stroke_opacity > 0.0f)
+        stroke_brush = brush;
+      for (auto& child : children)
+        child->setAllCurrentColor(brush);
     }
 
     Bounds boundingFillBox() const {
@@ -197,39 +213,33 @@ namespace visage {
     Bounds boundingBox() const { return boundingFillBox().unioned(boundingStrokeBox()); }
 
     void transformPaths(const Transform& transform) {
+      post_bounding_box = {};
+
       if (path.numPoints()) {
         path = path.transformed(transform);
         fill_brush.transform(transform);
+        post_bounding_box = path.boundingBox();
 
         if (stroke_path.numPoints()) {
           stroke_path = stroke_path.transformed(transform);
           stroke_brush.transform(transform);
+          post_bounding_box = post_bounding_box.unioned(stroke_path.boundingBox());
         }
       }
-      for (auto& child : children)
+      for (auto& child : children) {
         child->transformPaths(transform);
+        post_bounding_box = post_bounding_box.unioned(child->post_bounding_box);
+      }
+      for (auto& clip_path : clipping_paths)
+        clip_path = clip_path.transformed(transform);
     }
 
-    void applyClipping(Path* clip_path) {
-      if (clip_path == nullptr || clip_path->numPoints() == 0)
-        return;
-
+    void gatherPaths(std::vector<Path>& paths) {
       if (path.numPoints())
-        path = clip_path->combine(path, Path::Operation::Intersection);
-
-      if (stroke_path.numPoints())
-        stroke_path = clip_path->combine(stroke_path, Path::Operation::Intersection);
+        paths.push_back(path);
 
       for (auto& child : children)
-        child->applyClipping(clip_path);
-    }
-
-    void unionPaths(Path* result) {
-      if (path.numPoints())
-        *result = result->combine(path, Path::Operation::Union);
-
-      for (auto& child : children)
-        child->unionPaths(result);
+        child->gatherPaths(paths);
 
       path.clear();
       stroke_path.clear();
@@ -241,14 +251,15 @@ namespace visage {
     void adjustPaths(const Matrix& scale_matrix, const Bounds& view_box,
                      std::map<std::string, SvgDrawable*>& clip_paths);
     void strokePath(const Matrix& scale_matrix, const Bounds& view_box);
-    void setSize(const SvgViewSettings& view, float width, float height) {
+    void setSize(const SvgViewSettings& view, float width, float height, float scale = 1.0f) {
       if (width == 0.0f || height == 0.0f)
         return;
 
       std::map<std::string, SvgDrawable*> clip_paths;
       auto initial_transform = initialTransform(view, width, height);
-      initPaths(initial_transform.matrix, view.view_box);
-      adjustPaths(initial_transform.matrix, view.view_box, clip_paths);
+      auto dpi_scale = Matrix::scale(scale, scale);
+      initPaths(dpi_scale * initial_transform.matrix, view.view_box);
+      adjustPaths(dpi_scale * initial_transform.matrix, view.view_box, clip_paths);
       transformPaths(initial_transform);
     }
 
@@ -310,6 +321,8 @@ namespace visage {
     Brush stroke_brush;
     Path path;
     Path stroke_path;
+    Bounds post_bounding_box;
+    std::vector<Path> clipping_paths;
     Marker* marker_start = nullptr;
     Marker* marker_mid = nullptr;
     Marker* marker_end = nullptr;
@@ -382,7 +395,9 @@ namespace visage {
 
     explicit Svg(const EmbeddedFile& file) : Svg(file.data, file.size) { }
 
-    void setDimensions(int width, int height) { setDrawableDimensions(width, height); }
+    void setDimensions(int width, int height, float scale) {
+      setDrawableDimensions(width, height, scale);
+    }
 
     SvgDrawable* drawable() const { return drawable_.get(); }
 
@@ -411,11 +426,18 @@ namespace visage {
       resetDrawable();
     }
 
+    void setCurrentColor(const Brush& brush) {
+      current_color_ = brush;
+      if (drawable_)
+        drawable_->setAllCurrentColor(brush);
+    }
+
   private:
-    void setDrawableDimensions(int width, int height) {
+    void setDrawableDimensions(int width, int height, float scale) {
       if (width != draw_width_ || height != draw_height_) {
         draw_width_ = width;
         draw_height_ = height;
+        draw_scale_ = scale;
         resetDrawable();
       }
     }
@@ -424,19 +446,23 @@ namespace visage {
       if (!drawable_)
         return;
 
-      drawable_->setSize(view_, draw_width_, draw_height_);
+      drawable_->setSize(view_, draw_width_, draw_height_, draw_scale_);
       if (!fill_brush_.isNone())
         drawable_->setAllFillBrush(fill_brush_);
       if (!stroke_brush_.isNone())
         drawable_->setAllStrokeBrush(stroke_brush_);
+      if (!current_color_.isNone())
+        drawable_->setAllCurrentColor(current_color_);
     }
 
     SvgViewSettings view_;
     clone_ptr<SvgDrawable> drawable_;
     float draw_width_ = 0.0f;
     float draw_height_ = 0.0f;
+    float draw_scale_ = 1.0f;
 
     Brush fill_brush_;
     Brush stroke_brush_;
+    Brush current_color_;
   };
 }

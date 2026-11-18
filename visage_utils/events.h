@@ -421,6 +421,8 @@ namespace visage {
      * @brief Removes all callbacks from the list.
      */
     void clear() { callbacks_.clear(); }
+    bool isEmpty() const { return callbacks_.empty(); }
+
     /**
      * @brief Invokes all callbacks in the list.
      * @tparam Args The types of the arguments to pass to the callbacks.

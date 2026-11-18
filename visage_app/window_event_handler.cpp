@@ -29,17 +29,10 @@ namespace visage {
   WindowEventHandler::WindowEventHandler(ApplicationEditor* editor, Frame* frame) :
       editor_(editor), window_(editor->window()), content_frame_(frame) {
     window_->setEventHandler(this);
-    content_frame_->onResize() += resize_callback_;
   }
 
   WindowEventHandler::~WindowEventHandler() {
     window_->clearEventHandler();
-    if (content_frame_)
-      content_frame_->onResize() -= resize_callback_;
-  }
-
-  void WindowEventHandler::onFrameResize(const Frame* frame) const {
-    window_->setInternalWindowSize(frame->nativeWidth(), frame->nativeHeight());
   }
 
   void WindowEventHandler::setKeyboardFocus(Frame* frame) {
@@ -95,6 +88,20 @@ namespace visage {
   void WindowEventHandler::handleAdjustResize(int* width, int* height, bool horizontal_resize,
                                               bool vertical_resize) {
     editor_->adjustWindowDimensions(width, height, horizontal_resize, vertical_resize);
+  }
+
+  void WindowEventHandler::handleWindowShown() {
+    editor_->onShow().callback();
+  }
+
+  void WindowEventHandler::handleWindowHidden() {
+    editor_->onHide().callback();
+  }
+
+  bool WindowEventHandler::handleCloseRequested() {
+    if (editor_->onCloseRequested().isEmpty())
+      return true;
+    return editor_->onCloseRequested().callback();
   }
 
   bool WindowEventHandler::handleKeyDown(const KeyEvent& e) {
@@ -210,7 +217,7 @@ namespace visage {
     IPoint original_window_position = { x, y };
     mouse_event.window_position = convertToLogical(original_window_position);
     mouse_event.relative_position = mouse_event.window_position -
-                                    Point(window_->lastWindowMousePosition());
+                                    convertToLogical(window_->lastWindowMousePosition());
     mouse_event.relative_position.x = std::round(mouse_event.relative_position.x);
     mouse_event.relative_position.y = std::round(mouse_event.relative_position.y);
     if (!window_->mouseRelativeMode())
@@ -312,11 +319,11 @@ namespace visage {
     if (mouse_down_frame_) {
       mouse_event.position = mouse_event.window_position - mouse_down_frame_->positionInWindow();
       mouse_event.event_frame = mouse_down_frame_;
-      mouse_down_frame_->processMouseUp(mouse_event);
-      if (exited && mouse_down_frame_)
-        mouse_down_frame_->processMouseExit(mouse_event);
-
+      auto frame = mouse_down_frame_;
       mouse_down_frame_ = nullptr;
+      frame->processMouseUp(mouse_event);
+      if (exited && frame)
+        frame->processMouseExit(mouse_event);
     }
 
     mouse_event.event_frame = mouse_hovered_frame_;

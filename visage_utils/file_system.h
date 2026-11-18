@@ -54,6 +54,7 @@ namespace visage {
    * @return True if the file exists, false otherwise.
    */
   bool fileExists(const File& file);
+  bool isDirectory(const File& file);
   /**
    * @brief Appends text to the end of a file.
    * @param file The file to append to.
@@ -95,6 +96,8 @@ namespace visage {
    * @return A File object representing the path to the newly created temporary file.
    */
   File createTemporaryFile(const std::string& extension);
+  void createDirectory(const File& file);
+
   /**
    * @brief Gets the name of a file from a path, including the extension.
    * @param file The file path.

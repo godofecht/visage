@@ -104,6 +104,10 @@ namespace visage {
   template<typename T = int>
   class PackedAtlasMap {
   public:
+    static constexpr int kDefaultWidth = 64;
+
+    PackedAtlasMap() = default;
+
     bool addRect(T id, int width, int height) {
       VISAGE_ASSERT(lookup_.count(id) == 0);
 
@@ -120,9 +124,8 @@ namespace visage {
       lookup_.erase(id);
     }
 
-    void pack() {
-      static constexpr int kDefaultWidth = 64;
-      static constexpr int kMaxMultiples = 8;
+    void pack(int start_width = kDefaultWidth, int start_height = kDefaultWidth) {
+      static constexpr int kMaxDimension = 1 << 14;
 
       checkRemovedRects();
       if (packed_rects_.size() == 1) {
@@ -132,14 +135,19 @@ namespace visage {
           VISAGE_ASSERT(false);
       }
       else if (!packed_rects_.empty()) {
-        bool packed = false;
-        for (int m = 0; !packed && m < kMaxMultiples; ++m) {
-          width_ = height_ = kDefaultWidth << m;
-          if (fixed_width_)
-            width_ = fixed_width_;
-          packed = packer_.pack(packed_rects_, width_, height_);
+        width_ = std::max(kDefaultWidth, start_width);
+        height_ = std::max(kDefaultWidth, start_height);
+
+        while (width_ < kMaxDimension * 2 || height_ < kMaxDimension * 2) {
+          width_ = fixed_width_ ? fixed_width_ : std::min(kMaxDimension, width_);
+          height_ = std::min(kMaxDimension, height_);
+          if (packer_.pack(packed_rects_, width_, height_))
+            return;
+
+          width_ *= 2;
+          height_ *= 2;
         }
-        VISAGE_ASSERT(packed);
+        VISAGE_ASSERT(false);
       }
     }
 
@@ -216,11 +224,15 @@ namespace visage {
     static bgfx::VertexLayout& layout();
   };
 
-  struct LineVertex {
-    float x;
-    float y;
-    float fill;
-    float data;
+  struct PathVertex {
+    float index;
+    float direction;
+    float x1;
+    float y1;
+    float x2;
+    float y2;
+    float x3;
+    float y3;
 
     static bgfx::VertexLayout& layout();
   };

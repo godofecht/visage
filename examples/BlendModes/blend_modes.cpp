@@ -143,12 +143,13 @@ public:
 
   // The main draw call for the window.
   void draw(visage::Canvas& canvas) override {
+    static constexpr int kColumns = 12;
+
     // Set a dark background for the entire window.
     canvas.setColor(0xff222026);
     canvas.fill(0, 0, width(), height());
 
     // Draw a checkered background behind the transparent frame to make its effect visible.
-    static constexpr int kColumns = 12;
     int w = transparent_frame_.width();
     int h = transparent_frame_.height();
     int last_x = transparent_frame_.x();

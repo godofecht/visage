@@ -70,7 +70,7 @@ protected:
   // Allow the host to suggest a new size.
   bool guiAdjustSize(uint32_t* width, uint32_t* height) noexcept override;
   // The host is setting the size of the GUI.
-  bool guiSetSize(uint32_t width, uint32_t* height) noexcept override;
+  bool guiSetSize(uint32_t width, uint32_t height) noexcept override;
   // The host is requesting the size of the GUI.
   bool guiGetSize(uint32_t* width, uint32_t* height) noexcept override;
 

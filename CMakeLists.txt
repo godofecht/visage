@@ -1,11 +1,15 @@
 cmake_minimum_required(VERSION 3.17)
-project(visage VERSION 0.1.0)
-
 set(CMAKE_POLICY_DEFAULT_CMP0177 NEW)
+
+if (APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS deployment version")
+endif ()
 
 if (NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif ()
+
+project(visage VERSION 0.1.0)
 
 if (APPLE)
   enable_language(OBJC)
@@ -13,10 +17,12 @@ if (APPLE)
 endif ()
 
 option(VISAGE_AMALGAMATED_BUILD "Compile sources together" ON)
+option(VISAGE_USE_CUSTOM_RULES "Opt in to CMake 4.5 per-source shader and resource rules" OFF)
 option(VISAGE_ENABLE_WIDGETS "Add widgets library" ON)
 option(VISAGE_ENABLE_BACKGROUND_GRAPHICS_THREAD "Offloads graphics rendering to a background thread" OFF)
 option(VISAGE_ENABLE_GRAPHICS_DEBUG_LOGGING "Shows graphics debug log in console in debug mode" OFF)
 option(VISAGE_ADDRESS_SANITIZER "Enable AddressSanitizer" OFF)
+
 if (VISAGE_ADDRESS_SANITIZER)
   if (MSVC)
     add_compile_options(/fsanitize=address /Zi)
