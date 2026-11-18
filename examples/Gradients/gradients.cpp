@@ -66,16 +66,16 @@ visage::Color sampleOkLab(float t) {
 // Helper function to configure a Gradient's wrapping behavior based on a string name.
 void setPattern(visage::Gradient& gradient, const std::string& pattern) {
   if (pattern == "Single") {
-    gradient.setRepeat(false); // The gradient is drawn once.
+    gradient.setRepeat(false);  // The gradient is drawn once.
     gradient.setReflect(false);
   }
   else if (pattern == "Repeat") {
-    gradient.setRepeat(true); // The gradient repeats itself.
+    gradient.setRepeat(true);  // The gradient repeats itself.
     gradient.setReflect(false);
   }
-  else { // Reflect
+  else {  // Reflect
     gradient.setRepeat(false);
-    gradient.setReflect(true); // The gradient reflects back and forth (mirrored).
+    gradient.setReflect(true);  // The gradient reflects back and forth (mirrored).
   }
 }
 
@@ -89,8 +89,8 @@ public:
   static constexpr int kDotRadius = 5;
   enum ActivePoint {
     kNone,
-    kFrom, // The start point of the gradient
-    kTo    // The end point of the gradient
+    kFrom,  // The start point of the gradient
+    kTo  // The end point of the gradient
   };
 
   void resized() override {

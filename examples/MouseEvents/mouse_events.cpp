@@ -33,9 +33,9 @@ public:
     canvas.setColor(0xff000000);
     canvas.fill(0, 0, width(), height());
     if (down_)
-      canvas.setColor(0xff00ffff); // Cyan when mouse is down
+      canvas.setColor(0xff00ffff);  // Cyan when mouse is down
     else
-      canvas.setColor(0xffffffff); // White when mouse is up
+      canvas.setColor(0xffffffff);  // White when mouse is up
     canvas.circle(x_ - kRadius, y_ - kRadius, 2.0f * kRadius);
   }
 

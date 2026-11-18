@@ -30,7 +30,7 @@ static void drawRgbCircles(visage::Canvas& canvas, float width, float height) {
   // Define constants for circle layout.
   static constexpr float kCircleRadiusRatio = 0.2f;
   static constexpr float kVennRadiusRatio = 0.13f;
-  static constexpr float k60DegreeTriangleRatio = 0.866025403784f; // sin(60 degrees)
+  static constexpr float k60DegreeTriangleRatio = 0.866025403784f;  // sin(60 degrees)
 
   // Base dimensions on the smaller of width or height to maintain aspect ratio.
   float min_dimension = std::min(width, height);
@@ -43,11 +43,11 @@ static void drawRgbCircles(visage::Canvas& canvas, float width, float height) {
   float start_y = height / 2.0f - circle_radius;
 
   // Draw the three circles with their respective colors.
-  canvas.setColor(0xffff0000); // Red
+  canvas.setColor(0xffff0000);  // Red
   canvas.circle(start_x, start_y + venn_radius, 2 * circle_radius);
-  canvas.setColor(0xff00ff00); // Green
+  canvas.setColor(0xff00ff00);  // Green
   canvas.circle(start_x - venn_offset, start_y - venn_radius * 0.5f, 2 * circle_radius);
-  canvas.setColor(0xff0000ff); // Blue
+  canvas.setColor(0xff0000ff);  // Blue
   canvas.circle(start_x + venn_offset, start_y - venn_radius * 0.5f, 2 * circle_radius);
 }
 

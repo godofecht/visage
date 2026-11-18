@@ -113,9 +113,9 @@ public:
     // --- Bloom Post-Effect Setup ---
     // A post-effect is a shader that runs on the entire window content after it has been drawn.
     // The BloomPostEffect creates a "glow" or "bloom" effect for bright areas of the image.
-    bloom_.setBloomSize(30.0f); // The radius of the bloom in pixels.
-    bloom_.setBloomIntensity(2.0f); // The brightness of the bloom.
-    setPostEffect(&bloom_); // Apply the effect to this window.
+    bloom_.setBloomSize(30.0f);  // The radius of the bloom in pixels.
+    bloom_.setBloomIntensity(2.0f);  // The brightness of the bloom.
+    setPostEffect(&bloom_);  // Apply the effect to this window.
 
     // Add the animated line frame as a child.
     addChild(&animated_line_);

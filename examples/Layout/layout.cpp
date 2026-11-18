@@ -35,21 +35,21 @@ public:
     // Set various flexbox properties.
     // Dimensions can be specified in different units, like logical pixels (_px)
     // or viewport-relative units (_vmin, _vmax, _vw, _vh).
-    layout().setPadding(10_px); // Padding around the container.
-    layout().setFlexGap(10_px);   // Gap between child items.
+    layout().setPadding(10_px);  // Padding around the container.
+    layout().setFlexGap(10_px);  // Gap between child items.
 
     // Flexbox wrapping properties.
-    layout().setFlexWrap(true); // Allow items to wrap to the next line.
-    layout().setFlexReverseDirection(true); // Reverse the main axis direction.
-    layout().setFlexWrapReverse(true); // Reverse the cross-axis direction for wrapped lines.
+    layout().setFlexWrap(true);  // Allow items to wrap to the next line.
+    layout().setFlexReverseDirection(true);  // Reverse the main axis direction.
+    layout().setFlexWrapReverse(true);  // Reverse the cross-axis direction for wrapped lines.
 
     int i = 0;
     for (Frame& frame : frames_) {
       addChild(&frame);
 
       // Set layout properties for each child frame.
-      frame.layout().setHeight(100); // Fixed height.
-      frame.layout().setWidth(100 + i * 10); // Variable initial width.
+      frame.layout().setHeight(100);  // Fixed height.
+      frame.layout().setWidth(100 + i * 10);  // Variable initial width.
 
       // `setFlexGrow` determines how much a flex item will grow relative to the rest of the
       // flex items when there is extra space. Since all items have a grow factor of 1.0,

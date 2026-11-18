@@ -50,7 +50,7 @@ int runExample() {
 
   // 5. Show the window and submit the drawing commands.
   window->show();
-  canvas.submit(); // This sends the drawing commands to the GPU.
+  canvas.submit();  // This sends the drawing commands to the GPU.
 
   // 6. Run the window's event loop.
   //    In a real application, you would likely have a more complex loop that

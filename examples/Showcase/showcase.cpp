@@ -83,7 +83,7 @@ void Overlay::draw(visage::Canvas& canvas) {
   // Update the animation value for the overlay's appearance.
   float overlay_amount = animation_.update();
   if (!animation_.isTargeting() && overlay_amount == 0.0f)
-    setVisible(false); // Hide the frame when fully faded out.
+    setVisible(false);  // Hide the frame when fully faded out.
 
   // Draw the body and border of the overlay, using theme colors from the palette.
   visage::Bounds body = bodyBounds();

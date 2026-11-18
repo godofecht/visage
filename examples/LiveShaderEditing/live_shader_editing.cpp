@@ -70,7 +70,7 @@ public:
     // The `shapes_` frame will contain the animated graphics.
     shapes_.onDraw() = [this](visage::Canvas& canvas) {
       drawRotatingCircles(canvas, shapes_.width(), shapes_.height());
-      shapes_.redraw(); // Continuously redraw for animation.
+      shapes_.redraw();  // Continuously redraw for animation.
     };
 
     // Create a post-processing effect from a GLSL vertex and fragment shader.

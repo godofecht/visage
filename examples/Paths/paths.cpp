@@ -30,7 +30,7 @@ visage::Path starPath(float center_x, float center_y, float radius) {
   static constexpr float kPi = 3.14159265f;
 
   visage::Path path;
-  int num_points = 10; // 5 inner points and 5 outer points
+  int num_points = 10;  // 5 inner points and 5 outer points
 
   // Loop to calculate the vertices of the star.
   for (int i = 0; i < num_points; ++i) {
@@ -73,7 +73,7 @@ int runExample() {
     // --- Path Variations ---
 
     // 1. A stroked path: This creates a new path that represents the outline of the original star.
-    auto stroked = star.stroke(2); // The argument is the stroke width.
+    auto stroked = star.stroke(2);  // The argument is the stroke width.
 
     // 2. A dashed path: This also creates a stroked path, but with a dash pattern.
     float segment = star.length() / 40.0f;

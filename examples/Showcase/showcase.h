@@ -49,7 +49,7 @@ public:
   float bodyRounding();
 
   void mouseDown(const visage::MouseEvent& e) override {
-    animation_.target(false); // Animate the overlay out on click.
+    animation_.target(false);  // Animate the overlay out on click.
     redraw();
   }
   void visibilityChanged() override { animation_.target(isVisible()); }
