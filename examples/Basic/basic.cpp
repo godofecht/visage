@@ -22,21 +22,39 @@
 #include <visage/app.h>
 
 int runExample() {
+  // Create the main application window.
+  // The ApplicationWindow class handles the window creation, event loop, and drawing context.
   visage::ApplicationWindow app;
 
+  // Set the drawing callback.
+  // This lambda function will be called for each frame to draw the window's content.
   app.onDraw() = [&app](visage::Canvas& canvas) {
+    // Set the background color to a dark blue.
+    // Colors are represented as 32-bit integers in ARGB format (0xAARRGGBB).
     canvas.setColor(0xff000066);
+    // Fill the entire window with the current color.
     canvas.fill(0, 0, app.width(), app.height());
 
+    // Calculate the properties of a circle to be drawn in the center of the window.
     float circle_radius = app.height() * 0.1f;
     float x = app.width() * 0.5f - circle_radius;
     float y = app.height() * 0.5f - circle_radius;
+
+    // Set the circle color to cyan.
     canvas.setColor(0xff00ffff);
+    // Draw the circle.
     canvas.circle(x, y, 2.0f * circle_radius);
   };
 
+  // Set the title of the window.
   app.setTitle("Visage Basic Example");
+
+  // Show the window with a specific size.
   app.show(800, 600);
+
+  // Start the application's event loop.
+  // This function will block until the window is closed.
   app.runEventLoop();
+
   return 0;
 }

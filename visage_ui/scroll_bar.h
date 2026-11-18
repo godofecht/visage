@@ -26,6 +26,10 @@
 #include "visage_utils/time_utils.h"
 
 namespace visage {
+  /**
+   * @class ScrollBar
+   * @brief A vertical scroll bar control.
+   */
   class ScrollBar : public Frame {
   public:
     ScrollBar() :
@@ -46,21 +50,35 @@ namespace visage {
     void mouseDown(const MouseEvent& e) override;
     void mouseUp(const MouseEvent& e) override;
     void mouseDrag(const MouseEvent& e) override;
-
+    /**
+     * @brief Adds a callback to be invoked when the scroll bar is moved.
+     * @param callback The callback function.
+     */
     void addScrollCallback(std::function<void(float)> callback) {
       callbacks_.push_back(std::move(callback));
     }
-
+    /**
+     * @brief Sets the corner rounding of the scroll bar.
+     * @param rounding The corner rounding radius.
+     */
     void setRounding(float rounding) {
       rounding_ = rounding;
       redraw();
     }
-
+    /**
+     * @brief Sets the current position of the scroll bar.
+     * @param position The new position.
+     */
     void setPosition(int position) {
       position_ = position;
       redraw();
     }
-
+    /**
+     * @brief Sets the view parameters of the scroll bar.
+     * @param range The total range of the scrollable content.
+     * @param view_height The height of the visible area.
+     * @param position The current position of the visible area.
+     */
     void setViewPosition(int range, int view_height, int position) {
       range_ = range;
       view_height_ = view_height;
@@ -70,10 +88,20 @@ namespace visage {
       setIgnoresMouseEvents(!active_, true);
       redraw();
     }
-
+    /**
+     * @brief Gets the total range of the scrollable content.
+     * @return The total range.
+     */
     int viewRange() const { return range_; }
+    /**
+     * @brief Gets the height of the visible area.
+     * @return The view height.
+     */
     int viewHeight() const { return view_height_; }
-
+    /**
+     * @brief Sets whether the scroll bar is on the left side of its container.
+     * @param left True if the scroll bar is on the left side, false otherwise.
+     */
     void setLeftSide(bool left) { left_ = left; }
 
   private:
@@ -93,7 +121,10 @@ namespace visage {
 
     VISAGE_LEAK_CHECKER(ScrollBar)
   };
-
+  /**
+   * @class ScrollableFrame
+   * @brief A frame that can contain scrollable content.
+   */
   class ScrollableFrame : public Frame {
   public:
     static constexpr float kDefaultSmoothTime = 0.1f;
@@ -121,33 +152,66 @@ namespace visage {
     }
 
     void resized() override;
-
+    /**
+     * @brief Adds a child frame to the scrollable container.
+     * @param frame The frame to add.
+     * @param make_visible Whether to make the frame visible.
+     */
     void addScrolledChild(Frame* frame, bool make_visible = true) {
       container_.setVisible(true);
       container_.addChild(frame, make_visible);
     }
-
+    /**
+     * @brief Adds a child frame to the scrollable container.
+     * @param frame The frame to add.
+     * @param make_visible Whether to make the frame visible.
+     */
     void addScrolledChild(Frame& frame, bool make_visible = true) { addScrolledChild(&frame); }
-
+    /**
+     * @brief Adds a child frame to the scrollable container.
+     * @param frame The frame to add.
+     * @param make_visible Whether to make the frame visible.
+     */
     void addScrolledChild(std::unique_ptr<Frame> frame, bool make_visible = true) {
       container_.setVisible(true);
       container_.addChild(std::move(frame), make_visible);
     }
-
+    /**
+     * @brief Removes a child frame from the scrollable container.
+     * @param frame The frame to remove.
+     */
     void removeScrolledChild(Frame* frame) { container_.removeChild(frame); }
-
+    /**
+     * @brief Scrolls the content up by a small amount.
+     * @return True if scrolling was possible, false otherwise.
+     */
     bool scrollUp() {
       setYPosition(std::max(0.0f, y_position_ - height() / 8.0f));
       return true;
     }
-
+    /**
+     * @brief Scrolls the content down by a small amount.
+     * @return True if scrolling was possible, false otherwise.
+     */
     bool scrollDown() {
       setYPosition(y_position_ + height() / 8);
       return true;
     }
-
+    /**
+     * @brief Sets the corner rounding of the scroll bar.
+     * @param rounding The corner rounding radius.
+     */
     void setScrollBarRounding(float rounding) { scroll_bar_.setRounding(rounding); }
+    /**
+     * @brief Gets the total height of the scrollable content.
+     * @return The scrollable height.
+     */
     float scrollableHeight() const { return container_.height(); }
+    /**
+     * @brief Sets the total height of the scrollable content.
+     * @param total_height The total height of the content.
+     * @param view_height The height of the visible area.
+     */
     void setScrollableHeight(float total_height, float view_height = 0) {
       if (view_height == 0)
         view_height = height();
@@ -155,16 +219,28 @@ namespace visage {
       setYPosition(std::max(0.0f, std::min(y_position_, total_height - view_height)));
       scroll_bar_.setViewPosition(total_height, view_height, y_position_);
     }
-
+    /**
+     * @brief Sets the bounds of the scroll bar.
+     * @param x The x-coordinate of the scroll bar.
+     * @param y The y-coordinate of the scroll bar.
+     * @param width The width of the scroll bar.
+     * @param height The height of the scroll bar.
+     */
     void setScrollBarBounds(float x, float y, float width, float height) {
       scroll_bar_.setBounds(x, y, width, height);
     }
-
+    /**
+     * @brief Sets the vertical scroll position.
+     * @param position The new vertical position.
+     */
     void setYPosition(float position) {
       scrollPositionChanged(position);
       smooth_position_ = y_position_;
     }
-
+    /**
+     * @brief Gets the current vertical scroll position.
+     * @return The vertical position.
+     */
     float yPosition() const { return y_position_; }
 
     bool mouseWheel(const MouseEvent& e) override {
@@ -182,18 +258,38 @@ namespace visage {
       else
         return smoothScroll(delta);
     }
-
+    /**
+     * @brief Sets whether the scroll bar is on the left side of the frame.
+     * @param left True if the scroll bar is on the left side, false otherwise.
+     */
     void setScrollBarLeft(bool left) {
       scroll_bar_left_ = left;
       scroll_bar_.setLeftSide(left);
     }
-
+    /**
+     * @brief Gets the layout of the scrollable container.
+     * @return A reference to the layout.
+     */
     Layout& scrollableLayout() { return container_.layout(); }
-
+    /**
+     * @brief Gets the callback list for scroll events.
+     * @return A reference to the callback list.
+     */
     auto& onScroll() { return on_scroll_; }
+    /**
+     * @brief Gets the scroll bar associated with this frame.
+     * @return A reference to the scroll bar.
+     */
     ScrollBar& scrollBar() { return scroll_bar_; }
-
+    /**
+     * @brief Sets the sensitivity of the mouse wheel.
+     * @param sensitivity The new sensitivity value.
+     */
     void setSensitivity(float sensitivity) { sensitivity_ = sensitivity; }
+    /**
+     * @brief Sets the duration of the smooth scroll animation.
+     * @param seconds The duration in seconds.
+     */
     void setSmoothTime(float seconds) { smooth_time_ = seconds; }
 
   private:
